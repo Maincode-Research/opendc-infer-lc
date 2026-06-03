@@ -1,0 +1,25 @@
+# Extreme long-context probe for Qwen3-235B (DCA/1M config).
+# Small sample counts: each prompt is enormous and prefill is the bottleneck.
+seed: 20260603
+depths: [0.0, 0.5, 1.0]    # incl. middle ("lost in the middle") at extreme length
+
+splits:
+  lc_256k:
+    target_tokens: 262144
+    max_output_tokens: 64
+    n_samples: 24
+    tasks: {niah_multikey: 1.0}
+  lc_512k:
+    target_tokens: 524288
+    max_output_tokens: 64
+    n_samples: 16
+    tasks: {niah_multikey: 1.0}
+  lc_960k:
+    target_tokens: 983040          # < 1,010,000 cap, leaves room for output
+    max_output_tokens: 64
+    n_samples: 12
+    tasks: {niah_multikey: 1.0}
+
+multikey_distractors: 3
+warmup:
+  per_split: 3

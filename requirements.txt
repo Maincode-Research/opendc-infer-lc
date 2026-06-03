@@ -1,0 +1,6 @@
+# Real-tokenizer path. The offline `--tokenizer char` smoke path needs none of these.
+transformers>=4.45.0
+tokenizers>=0.20.0
+PyYAML>=6.0
+# sentencepiece is pulled in by some tokenizers (e.g. Llama slow path)
+sentencepiece>=0.2.0

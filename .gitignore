@@ -1,0 +1,13 @@
+# generated / large / machine-specific — never commit
+# frozen prompt sets (rebuild via opendc_data.build; contains >100MB files)
+data/
+# benchmark run outputs
+results/
+.venv/
+.hf_cache/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.log
+*.out
+*.err

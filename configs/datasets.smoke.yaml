@@ -1,0 +1,30 @@
+# Tiny config for offline pipeline validation (--tokenizer char).
+# Lengths are in char-approx "tokens"; NOT for ranked artifacts.
+
+seed: 1
+depths: [0.0, 0.5, 1.0]
+
+splits:
+  lc_8k:
+    target_tokens: 800
+    max_output_tokens: 512
+    n_samples: 12
+    tasks:
+      niah_single:   0.5
+      niah_multikey: 0.5
+  lc_128k:
+    target_tokens: 4000
+    max_output_tokens: 1024
+    n_samples: 6
+    tasks:
+      niah_multikey: 1.0
+  lc_cache:
+    prefix_tokens: 1500
+    max_output_tokens: 256
+    n_prefixes: 1
+    turns_per_prefix: 8
+    keys_in_prefix: 6
+
+multikey_distractors: 3
+warmup:
+  per_split: 4

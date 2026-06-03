@@ -1,0 +1,46 @@
+# OpenDC-Infer-LC dataset definition (v1.0 candidate).
+# Sample counts sized to fill the measurement window without looping
+# (looping would inflate prefix-cache hit rate artificially).
+
+seed: 20260602  # global base seed; per-sample seeds derive from this deterministically
+
+depths: [0.0, 0.25, 0.5, 0.75, 1.0]   # needle insertion depths swept per split
+
+splits:
+  lc_8k:
+    target_tokens: 8192
+    max_output_tokens: 512
+    n_samples: 1000
+    tasks:
+      niah_single:   0.5    # fraction of n_samples
+      niah_multikey: 0.5
+
+  lc_32k:
+    target_tokens: 32768
+    max_output_tokens: 512
+    n_samples: 1000
+    tasks:
+      niah_single:   0.5
+      niah_multikey: 0.5
+
+  lc_128k:
+    target_tokens: 131072
+    max_output_tokens: 1024
+    n_samples: 300
+    tasks:
+      niah_multikey: 1.0    # multi-hop: 4 keys, query one, distractors present
+
+  lc_cache:
+    prefix_tokens: 32768
+    max_output_tokens: 256
+    n_prefixes: 1           # one shared, byte-identical prefix (spec 2.10)
+    turns_per_prefix: 500   # distinct query turns against the shared prefix
+    keys_in_prefix: 16      # needles embedded in the prefix; turns query different ones
+
+# Number of distractor needles for multikey tasks (the true needle + distractors).
+multikey_distractors: 3
+
+# Held-out warmup set (distinct prompts so warmup does not pre-fill the
+# measured set; critical for lc_cache cold-cache mode).
+warmup:
+  per_split: 64
