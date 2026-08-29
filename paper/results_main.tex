@@ -1,0 +1,53 @@
+% Main single-node results (body) — LC workloads. RAG workloads are in
+% Table~\ref{tab:rag}; full per-load-point tables are in the appendix.
+% Requires: \usepackage{booktabs, multirow}.
+\begin{table*}[t]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{6pt}
+  \begin{tabular}{@{}l l r r r r r r@{}}
+    \toprule
+    \textbf{Model} & \textbf{Config} & \textbf{LC-8K} & \textbf{LC-32K} &
+    \textbf{LC-128K} & \textbf{LC-Cache} & \textbf{Power} & \textbf{tok/J} \\
+     & & \multicolumn{4}{c}{SLO-qualified goodput$_{\,\text{C}^\star}$ (tok/s)} & (W) & (LC-Cache) \\
+    \midrule
+    \multirow{7}{*}{\shortstack[l]{\textbf{235B}\\ \footnotesize A22B\\ \footnotesize TP8}}
+      & MI355X $\cdot$ vLLM BF16    & 22.2$_{2}$  & 3.6$_{1}$  & ---  & 47.5$_{8}$  & 484 & 0.098 \\
+      & MI355X $\cdot$ SGLang BF16  & \textbf{31.3}$_{4}$ & \textbf{6.5}$_{1}$ & \textbf{0.9}$_{1}$ & \textbf{99.6}$_{16}$ & 534 & \textbf{0.187} \\
+      & MI355X $\cdot$ vLLM FP8 (dyn) & 16.8$_{2}$ & 2.9$_{1}$ & --- & 29.9$_{4}$ & 445 & 0.067 \\
+      & MI355X $\cdot$ vLLM MXFP4   & 21.2$_{2}$  & 3.9$_{1}$  & ---  & 48.3$_{8}$  & \textbf{439} & 0.110 \\
+    \cmidrule(l){2-8}
+      & B200 $\cdot$ vLLM BF16      & 36.4$_{4}$  & 7.2$_{1}$  & 1.2$_{1}$  & 64.6$_{16}$  & --- & --- \\
+      & B200 $\cdot$ SGLang BF16    & \textbf{38.3}$_{4}$ & \textbf{9.1}$_{2}$ & \textbf{1.3}$_{1}$ & 63.8$_{8}$ & --- & --- \\
+      & B200 $\cdot$ TRT-LLM BF16   & 32.2$_{4}$  & 6.7$_{1}$  & 1.2$_{1}$  & \textbf{129.9}$_{16}$ & --- & --- \\
+    \midrule
+    \multirow{5}{*}{\shortstack[l]{\textbf{35B}\\ \footnotesize A3B\\ \footnotesize MI355X}}
+      & vLLM BF16 (TP8)      & 952.5$_{64}$  & 44.6$_{4}$  & ---   & 34.1$_{8}^\ddagger$  & 340 & 0.100$^\ddagger$ \\
+      & \textbf{SGLang BF16 (TP8)} & \textbf{1450.9}$_{64}$ & \textbf{660.0}$_{32}$ & \textbf{257.2}$_{16}$ & \textbf{157.9}$_{32}^\ddagger$ & 377 & \textbf{0.419}$^\ddagger$ \\
+    \cmidrule(l){2-8}
+      & vLLM BF16 (TP1, FP8 ctrl) & 194.8$_{8}$  & 22.1$_{1}$  & ---   & 12.8$_{1}^\ddagger$  & 396 & 0.032$^\ddagger$ \\
+      & vLLM FP8 (dyn, TP1)  & 148.6$_{8}$  & 25.6$_{1}$  & ---   & 4.3$_{1}^\ddagger$   & 377 & 0.011$^\ddagger$ \\
+      & vLLM MXFP4           & \multicolumn{4}{c}{\emph{blocked (vLLM MoE-MXFP4 loader)}} & --- & --- \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{Main single-node results} on AMD MI355X and NVIDIA B200
+  (8 GPUs/node each), on the four long-context workloads, grouped by model and
+  platform (best per platform in bold). Industry-RAG results are reported separately
+  in Table~\ref{tab:rag}. Each value is peak SLO-qualified output-token goodput
+  (tok/s); the \emph{subscript is}~C$^\star$, the closed-loop concurrency of
+  \emph{maximum} goodput (not the highest qualifying concurrency, since goodput can
+  fall again at very high load). ``---''$=$ no SLO-qualified point or not run; B200
+  power was not collected (AMD-only telemetry), so its energy columns are blank.
+  \emph{Power} is mean total GPU draw; tok/J is LC-Cache goodput$/$power.
+  TensorRT-LLM is CUDA-only (B200-only).
+  The 35B FP8/BF16 comparison is at $\text{TP}{=}1$ because the 35B's multimodal
+  vision-encoder MLP ($4304$) is not 16-divisible after an 8-way shard
+  (the ``BF16 (TP1, FP8 ctrl)'' row is its parallelism-matched control).
+  $^\ddagger$\textbf{The 35B fails the needle-recall quality guardrail on LC-Cache}
+  (QualityRatio $0.2$--$0.6$ versus $1.0$ for the 235B)---it serves these fast but
+  answers incorrectly most of the time, so the marked goodput is \emph{valid-only}
+  throughput far below the raw rate. Per-load-point detail (with raw rates and
+  quality) is in App.~\ref{tab:single-node-235b} (235B),
+  \ref{tab:full-matrix-35b} (35B), and \ref{tab:full-matrix-b200} (B200).}
+  \label{tab:main}
+\end{table*}

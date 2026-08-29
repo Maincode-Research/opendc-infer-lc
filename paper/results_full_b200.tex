@@ -1,0 +1,64 @@
+% Single-node NVIDIA B200 full per-load-point matrix (cross-vendor appendix).
+% Requires: \usepackage{longtable, booktabs, amssymb}.
+% MODEL: Qwen3-235B-A22B (confirmed by the colleague). The export filename said
+% "35B" but both B200 runs were the 235B; caption set to 235B accordingly.
+\begin{longtable}{@{}l l r c r r r r r c c@{}}
+\caption{Single-node B200 complete results matrix: every completed backend
+$\times$ workload $\times$ load point. Qwen3-235B-A22B, 8$\times$B200, TP$=$8,
+BF16, 132K served context. Goodput is output tokens/s; latencies are in seconds;
+TPOT is seconds/token. Q$=$SLO-qualified; succ$=$success rate; qual$=$needle-recall
+quality.}\label{tab:full-matrix-b200}\\
+\toprule
+config & workload & lvl & Q & goodput & raw & TTFT$_{95}$ & TPOT$_{95}$ & E2E$_{95}$ & succ & qual \\
+\midrule
+\endfirsthead
+\multicolumn{11}{@{}l}{\emph{\tablename~\thetable\ (continued)}}\\ \toprule
+config & workload & lvl & Q & goodput & raw & TTFT$_{95}$ & TPOT$_{95}$ & E2E$_{95}$ & succ & qual \\ \midrule
+\endhead
+\midrule \multicolumn{11}{r@{}}{\emph{continued on next page}}\\ \endfoot
+\bottomrule\endlastfoot
+vLLM BF16 & lc\_8k & 1 & \checkmark & 27.3 & 27.3 & 0.1929 & 0.0092 & 0.2476 & 1 & 1 \\
+vLLM BF16 & lc\_8k & 2 & \checkmark & 31.97 & 32.0 & 0.3774 & 0.0372 & 0.438 & 1 & 1 \\
+vLLM BF16 & lc\_8k & 4 & \checkmark & 36.4 & 36.4 & 0.6906 & 0.0924 & 0.7607 & 1 & 1 \\
+vLLM BF16 & lc\_8k & 8 & $\times$ & 38.27 & 38.3 & 1.203 & 0.2015 & 1.442 & 1 & 1 \\
+vLLM BF16 & lc\_32k & 1 & \checkmark & 7.233 & 7.23 & 0.8666 & 0.0100 & 0.9254 & 1 & 1 \\
+vLLM BF16 & lc\_32k & 2 & $\times$ & 7.467 & 7.47 & 1.734 & 0.139 & 1.796 & 1 & 1 \\
+vLLM BF16 & lc\_128k & 1 & \checkmark & 1.167 & 1.17 & 5.585 & 0.0077 & 5.623 & 1 & 1 \\
+vLLM BF16 & lc\_128k & 2 & $\times$ & 1.400 & 1.40 & 8.903 & 0.2723 & 10.53 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 1 & \checkmark & 33.48 & 33.5 & 0.1162 & 0.0097 & 0.1739 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 2 & \checkmark & 42.70 & 42.7 & 0.2218 & 0.0169 & 0.3041 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 4 & \checkmark & 55.53 & 55.5 & 0.4228 & 0.0266 & 0.5813 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 8 & \checkmark & 62.53 & 62.5 & 0.8416 & 0.0475 & 1.085 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 16 & \checkmark & 64.63 & 64.6 & 1.656 & 0.0971 & 2.149 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 32 & $\times$ & 75.02 & 75.0 & 2.968 & 0.1933 & 3.893 & 1 & 1 \\
+\midrule
+SGLang BF16 & lc\_8k & 1 & \checkmark & 30.57 & 30.6 & 0.1710 & 0.0083 & 0.2202 & 1 & 1 \\
+SGLang BF16 & lc\_8k & 2 & \checkmark & 35.00 & 35.0 & 0.3266 & 0.0258 & 0.3930 & 1 & 1 \\
+SGLang BF16 & lc\_8k & 4 & \checkmark & 38.27 & 38.3 & 0.6365 & 0.0814 & 0.7481 & 1 & 1 \\
+SGLang BF16 & lc\_8k & 8 & $\times$ & 39.20 & 39.2 & 1.262 & 0.1923 & 1.473 & 1 & 1 \\
+SGLang BF16 & lc\_32k & 1 & \checkmark & 8.400 & 8.40 & 0.7431 & 0.0102 & 0.8031 & 1 & 1 \\
+SGLang BF16 & lc\_32k & 2 & \checkmark & 9.100 & 9.10 & 1.443 & 0.1137 & 1.577 & 1 & 1 \\
+SGLang BF16 & lc\_32k & 4 & $\times$ & 9.333 & 9.33 & 2.845 & 0.3598 & 3.131 & 1 & 1 \\
+SGLang BF16 & lc\_128k & 1 & \checkmark & 1.283 & 1.28 & 6.459 & 0.0102 & 6.520 & 1 & 1 \\
+SGLang BF16 & lc\_128k & 2 & $\times$ & 1.867 & 1.87 & 10.12 & 0.8334 & 10.36 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 1 & \checkmark & 30.45 & 30.4 & 0.1350 & 0.0097 & 0.1925 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 2 & \checkmark & 36.87 & 36.9 & 0.2564 & 0.0172 & 0.3567 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 4 & \checkmark & 53.32 & 53.3 & 0.3857 & 0.0450 & 0.5976 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 8 & \checkmark & 63.82 & 63.8 & 0.5897 & 0.0728 & 1.026 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 16 & $\times$ & 74.78 & 74.8 & 1.211 & 0.1324 & 1.887 & 1 & 1 \\
+\midrule
+TRT-LLM BF16 & lc\_8k & 1 & \checkmark & 21.93 & 21.9 & 0.2199 & 0.0161 & 0.3148 & 1 & 1 \\
+TRT-LLM BF16 & lc\_8k & 2 & \checkmark & 31.50 & 31.5 & 0.3901 & 0.0485 & 0.5095 & 1 & 1 \\
+TRT-LLM BF16 & lc\_8k & 4 & \checkmark & 32.20 & 32.2 & 0.7299 & 0.1067 & 0.8721 & 1 & 1 \\
+TRT-LLM BF16 & lc\_8k & 8 & $\times$ & 36.40 & 36.4 & 1.387 & 0.2173 & 1.570 & 1 & 1 \\
+TRT-LLM BF16 & lc\_32k & 1 & \checkmark & 6.650 & 6.65 & 0.9194 & 0.0201 & 1.035 & 1 & 1 \\
+TRT-LLM BF16 & lc\_32k & 2 & $\times$ & 7.233 & 7.23 & 1.766 & 0.1594 & 1.917 & 1 & 1 \\
+TRT-LLM BF16 & lc\_128k & 1 & \checkmark & 1.167 & 1.17 & 5.677 & 0.0249 & 5.816 & 1 & 1 \\
+TRT-LLM BF16 & lc\_128k & 2 & $\times$ & 1.167 & 1.17 & 11.08 & 0.9274 & 11.42 & 1 & 1 \\
+TRT-LLM BF16 & lc\_cache & 1 & \checkmark & 26.02 & 26.0 & 0.1407 & 0.0176 & 0.2446 & 1 & 1 \\
+TRT-LLM BF16 & lc\_cache & 2 & \checkmark & 40.02 & 40.0 & 0.2010 & 0.0264 & 0.3381 & 1 & 1 \\
+TRT-LLM BF16 & lc\_cache & 4 & \checkmark & 59.03 & 59.0 & 0.2847 & 0.0395 & 0.4990 & 1 & 1 \\
+TRT-LLM BF16 & lc\_cache & 8 & \checkmark & 77.82 & 77.8 & 0.5892 & 0.0676 & 0.8570 & 1 & 1 \\
+TRT-LLM BF16 & lc\_cache & 16 & \checkmark & 129.85 & 129.8 & 0.6987 & 0.0869 & 1.062 & 1 & 1 \\
+TRT-LLM BF16 & lc\_cache & 32 & $\times$ & 136.20 & 136.2 & 1.324 & 0.1538 & 1.877 & 1 & 1 \\
+\end{longtable}

@@ -1,0 +1,31 @@
+# E1 — realistic million-token application workloads (Qwen3-235B + chunder).
+# Sample counts are deliberately tiny: one 983K-token request is ~25 min of
+# prefill on the 235B, so 4 x 3 workloads is already ~5 GPU-hours.
+seed: 20260723
+depths: [0.0]
+
+splits:
+  app_repocode_1m:            # repository-scale code analysis (HF transformers)
+    target_tokens: 983040
+    max_output_tokens: 32
+    n_samples: 4
+    code_roots: py+transformers
+    tasks: {repocode: 1.0}
+
+  app_docqa_1m:               # long-document multi-hop QA (LongBench HotpotQA)
+    target_tokens: 983040
+    max_output_tokens: 64
+    n_samples: 4
+    source_path: data/_public_src/hotpotqa.jsonl
+    tasks: {realqa: 1.0}
+
+  app_summ_1m:                # retrieve-then-summarize (LongBench gov_report)
+    target_tokens: 983040
+    max_output_tokens: 512
+    n_samples: 4
+    source: longbench/gov_report
+    source_path: data/_public_src/gov_report.jsonl:data/_public_src/qmsum.jsonl:data/_public_src/multi_news.jsonl:data/_public_src/hotpotqa.jsonl:data/_public_src/2wikimqa.jsonl:data/_public_src/qasper.jsonl
+    tasks: {summarization: 1.0}
+
+warmup:
+  per_split: 0

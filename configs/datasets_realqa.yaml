@@ -1,0 +1,27 @@
+# Public realistic RAG workload only (external validity). Built separately so the
+# frozen LC-* and synthetic RAG splits are untouched; rag_realqa.jsonl is dropped
+# into the same data dir used by the runners. Source: LongBench HotpotQA
+# (real Wikipedia multi-document QA), packed with real distractor passages to 32K
+# and graded by token-F1.
+seed: 20260602
+depths: [0.0]
+
+splits:
+  rag_realqa:                   # Wikipedia multi-document QA (LongBench HotpotQA)
+    target_tokens: 32768
+    max_output_tokens: 64
+    n_samples: 200
+    source_path: data/_public_src/hotpotqa.jsonl
+    tasks:
+      realqa: 1.0
+
+  rag_sciqa:                    # scientific-paper QA (LongBench QASPER)
+    target_tokens: 32768
+    max_output_tokens: 64
+    n_samples: 200
+    source_path: data/_public_src/qasper.jsonl
+    tasks:
+      realqa: 1.0
+
+warmup:
+  per_split: 32

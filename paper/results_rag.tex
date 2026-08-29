@@ -1,0 +1,41 @@
+% Industry-RAG main results (RAG-TopK, RAG-Report), single-node AMD MI355X, BF16.
+% Same style as Table~\ref{tab:main}: goodput is peak SLO-qualified output tok/s
+% with C* as a subscript; best goodput per workload in bold. A quality column is
+% added per workload because correctness is the RAG result. Raw (unfiltered) rates
+% and full ladders are in App.~\ref{tab:full-matrix-rag}.
+\begin{table}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}l l r c r c@{}}
+    \toprule
+    & & \multicolumn{2}{c}{\textbf{RAG-TopK}} & \multicolumn{2}{c}{\textbf{RAG-Report}} \\
+    \cmidrule(lr){3-4}\cmidrule(lr){5-6}
+    \textbf{Model} & \textbf{Backend} & goodput$_{\,\text{C}^\star}$ & qual & goodput$_{\,\text{C}^\star}$ & qual \\
+    \midrule
+    \multirow{2}{*}{\shortstack[l]{\textbf{35B}\\ \footnotesize A3B}}
+      & vLLM   & \textbf{17.1}$_{8}$ & 0.21 & 10.2$_{1}$ & 1.00 \\
+      & SGLang & 4.3$_{1}$ & 0.17 & \textbf{500.8}$_{32}$ & 0.95 \\
+    \midrule
+    \multirow{2}{*}{\shortstack[l]{\textbf{235B}\\ \footnotesize A22B}}
+      & vLLM   & 3.6$_{1}$ & \textbf{1.00} & 25.1$_{2}$ & 1.00 \\
+      & SGLang & 5.4$_{1}$ & \textbf{1.00} & 50.7$_{4}$ & 1.00 \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{Industry-RAG results} on AMD MI355X (8 GPUs, TP$=$8, BF16, 32K
+  context). \textbf{RAG-TopK} is top-$k$ retrieval ($k{=}64$ passages, one
+  carrying the answer among same-format distractors); \textbf{RAG-Report} is
+  long-output ($2048$-token) multi-fact generation. Goodput is peak SLO-qualified
+  output-token goodput (tok/s) with C$^\star$ as a subscript (best per workload in
+  bold); \emph{qual} is the needle-recall quality score; raw rates and full ladders
+  are in App.~\ref{tab:full-matrix-rag}. Two effects stand out.
+  \emph{(i)~RAG-TopK separates the tiers on correctness:} the 235B answers it at
+  quality $1.00$ while the 35B reaches only $0.17$--$0.21$ (it retrieves the wrong
+  magic number among the distractors)---and although the 35B's quality-gated goodput
+  is \emph{higher} ($17.1$ vs.\ $3.6$--$5.4$, it being far less prefill-bound at
+  32K), it is wrong $\sim$80\% of the time, so only the quality column exposes which
+  tier is usable. \emph{(ii)~RAG-Report is decode-bound:} both tiers answer
+  correctly, but the backends differ enormously in batching the long output---35B
+  SGLang reaches $501$\,tok/s at C$^\star{=}32$ whereas 35B vLLM stalls at $10$
+  (C$^\star{=}1$), a $\sim$50$\times$ gap.}
+  \label{tab:rag}
+\end{table}

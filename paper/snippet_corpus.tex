@@ -1,0 +1,35 @@
+% Replacement for: [TODO: Specify the final public document sources or
+% synthetic corpus generation method.]  Drop into the datasets subsection.
+
+\paragraph{Corpus: synthetic, not sourced from public documents.}
+We deliberately do \emph{not} build the long-context haystack from public
+documents (e.g.\ web crawl, books, or Wikipedia). Instead the entire corpus is
+\textbf{procedurally generated from a seeded random number generator}, for three
+reasons. (i)~\textbf{Metric integrity:} a fixed real passage repeated as filler
+is highly compressible and would inflate the serving backend's prefix-cache hit
+rate and KV reuse---distorting the exact cache-behavior metrics the benchmark is
+designed to measure; seeded \emph{variety} avoids this. (ii)~\textbf{License
+cleanliness:} a fully synthetic corpus carries no copyright or redistribution
+constraints, so the frozen prompt sets can be released as-is.
+(iii)~\textbf{Reproducibility and exact length control:} every prompt is
+regenerable bit-for-bit from its seed and fitted to an exact token budget.
+
+\paragraph{Generation method (RULER-style NIAH).}
+Each prompt follows a needle-in-a-haystack template: an instruction header, a long
+synthetic \emph{haystack}, one or more embedded \emph{needles}, and a question
+footer. The haystack is assembled from a seeded sentence generator that draws from
+fixed adjective/noun/verb/connective vocabularies to emit varied, natural-looking
+distractor sentences (overshooting the character budget, then truncated). A needle
+is a distinctive ``magic number'' statement---\emph{``One of the special magic
+numbers for \texttt{<key>} is: \texttt{<value>}.''}---where \texttt{key} is drawn
+from a fixed keyword set (e.g.\ \texttt{azimuth}, \texttt{basalt}, \texttt{quartz})
+and \texttt{value} is a random 7-digit integer, giving an unambiguous exact-match
+target for the quality guardrail. We use two variants: \textbf{single-key}
+(one needle) and \textbf{multi-key} (one queried needle plus several decoy needles
+with different keys at evenly spread depths, testing retrieval under competing
+similar patterns). Needles are inserted at controlled relative depths in the token
+stream. Finally, a length-control step re-tokenizes the decoded prompt with the
+declared tokenizer and truncates/pads the filler so the total hits the target
+token count \emph{exactly} (recorded per sample; $\leq 5$-token drift). Because
+token boundaries are tokenizer-specific, the frozen sets are generated \emph{per
+tokenizer} (one tree per model) and pinned by a \texttt{dataset\_version\_hash}.

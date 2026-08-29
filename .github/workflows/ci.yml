@@ -1,0 +1,33 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install .
+      # End-to-end: build a dataset, serve a mock endpoint, measure, score, report.
+      - run: opendc-bench selftest
+      # Datasets must be byte-identical regardless of PYTHONHASHSEED.
+      - name: dataset determinism
+        run: |
+          PYTHONHASHSEED=0 opendc-data build --config datasets.smoke.yaml --tokenizer char --out /tmp/a
+          PYTHONHASHSEED=1 opendc-data build --config datasets.smoke.yaml --tokenizer char --out /tmp/b
+          python - <<'PY'
+          import json, sys
+          a = json.load(open("/tmp/a/MANIFEST.json"))["dataset_version_hash"]
+          b = json.load(open("/tmp/b/MANIFEST.json"))["dataset_version_hash"]
+          print(a, b)
+          sys.exit(0 if a == b else "dataset build is not reproducible")
+          PY

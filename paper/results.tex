@@ -33,3 +33,75 @@
   is the bottleneck. Numbers are conservative (eager mode).}
   \label{tab:results-mi355x}
 \end{table*}
+
+% Precision / energy-efficiency study (vLLM, same node/config as Table 1).
+\begin{table}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}l r r r r r@{}}
+    \toprule
+    \textbf{Precision} & \textbf{LC-8K} & \textbf{LC-32K} & \textbf{LC-Cache} & \textbf{Power} & \textbf{tok/J} \\
+     & \multicolumn{3}{c}{goodput (tok/s)} & (W) & (LC-Cache) \\
+    \midrule
+    BF16 (reference) & 22.2 & 3.6 & 47.5 & 484 & 0.098 \\
+    FP8 (dynamic)    & 16.8 & 2.9 & 29.9 & 445 & 0.067 \\
+    MXFP4 (Quark)    & 21.2 & \textbf{3.9} & \textbf{48.3} & \textbf{439} & \textbf{0.110} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Precision / energy efficiency on AMD MI355X (Qwen3-235B-A22B, vLLM,
+  TP$=$8, 132K context). Goodput is SLO-qualified tok/s at the highest qualified
+  concurrency; \emph{Power} is mean total GPU draw over the run; tok/J is
+  goodput\,/\,power. \textbf{MXFP4 matches BF16 goodput at $\sim$9\% lower power
+  ($+$12\% tok/J), with quality intact}, whereas \emph{dynamic} FP8 regresses
+  both goodput and tok/J on this stack. LC-128K is omitted (no SLO-qualified
+  point at any precision). tok/J uses run-average power; window-aligned energy
+  integration is left to future work.}
+  \label{tab:precision-mi355x}
+\end{table}
+
+% Full single-node 235B matrix: every run (backends, precisions, engine modes,
+% cache modes, load modes, repeats, and the 32K-ctx baseline).
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}l l c c c c r r@{}}
+    \toprule
+    \textbf{Run} & \textbf{Configuration} & \textbf{LC-8K} & \textbf{LC-32K} &
+    \textbf{LC-128K} & \textbf{LC-Cache} & \textbf{Power} & \textbf{tok/J} \\
+     & & \multicolumn{4}{c}{SLO-qualified goodput (tok/s), subscript $=$ C$^\star$} &
+    (W) & (cache) \\
+    \midrule
+    \multicolumn{8}{@{}l}{\emph{vLLM BF16 baseline (repeats — run-to-run variance)}}\\
+    540 & vLLM BF16             & 23.1$_{2}$ & 3.6$_{1}$ & $\times$ & 98.9$_{16}$ & ---  & ---   \\
+    543 & vLLM BF16             & 22.9$_{2}$ & 3.6$_{1}$ & $\times$ & 49.5$_{8}$  & 485  & 0.102 \\
+    544 & vLLM BF16             & 22.2$_{2}$ & 3.6$_{1}$ & $\times$ & 47.5$_{8}$  & 484  & 0.098 \\
+    539 & vLLM BF16, 32K ctx$^a$ & 23.1$_{2}$ & $\times$  & ---      & $\times$    & ---  & ---   \\
+    \midrule
+    \multicolumn{8}{@{}l}{\emph{backend}}\\
+    545 & SGLang BF16          & \textbf{31.3$_{4}$} & \textbf{6.5$_{1}$} & \textbf{0.9$_{1}$} & \textbf{99.6$_{16}$} & 534 & \textbf{0.187} \\
+    \midrule
+    \multicolumn{8}{@{}l}{\emph{precision}}\\
+    552 & vLLM FP8 (dynamic)   & 16.8$_{2}$ & 2.9$_{1}$ & $\times$ & 29.9$_{4}$ & 445 & 0.067 \\
+    557 & vLLM MXFP4 (Quark)   & 21.2$_{2}$ & 3.9$_{1}$ & $\times$ & 48.3$_{8}$ & \textbf{439} & 0.110 \\
+    \midrule
+    \multicolumn{8}{@{}l}{\emph{engine / cache / load modes}}\\
+    551 & vLLM BF16, HIP graphs & 15.9$_{2}$ & $\times$ & $\times$ & $\times$   & 450 & ---   \\
+    553 & vLLM BF16, cold cache & ---        & ---      & ---      & 3.0$_{1}$  & 487 & 0.006 \\
+    550 & vLLM BF16, open-loop$^b$ & ---     & $\times$ & ---      & ---        & 474 & ---   \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{Single-node 235B} --- every run. Qwen3-235B-A22B on
+  8$\times$AMD MI355X (TP$=$8, 132K served context unless noted). Each cell is
+  SLO-qualified output-token goodput (tok/s); subscript is C$^\star$, the highest
+  SLO-qualified closed-loop concurrency. ``$\times$''$=$ran but no SLO-qualified
+  point; ``---''$=$workload not run. \emph{Power} is mean total GPU draw; tok/J
+  is LC-Cache goodput\,/\,power. All data runs had 100\% success and 100\%
+  needle-recall quality.
+  $^a$Run 539 served at 32K context, so LC-32K/Cache overflow the window.
+  $^b$Run 550 is open-loop Poisson on LC-32K; it saturated at $\le$1\,rps.
+  \textbf{Not shown (no data):} 541 vLLM 1M/DCA (dual-chunk attention
+  unsupported on ROCm), 546 TGI-ROCm (image/gfx950 unsupported), 547--549
+  (config bug; re-run as 551--553), 554--556 (Quark MXFP4 quantization that
+  produced run 557's checkpoint).}
+  \label{tab:single-node-235b}
+\end{table*}

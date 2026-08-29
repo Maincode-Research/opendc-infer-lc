@@ -16,11 +16,46 @@ from typing import Dict, List
 from .metrics import RequestResult
 
 
+
+def _lcs(a: List[str], b: List[str]) -> int:
+    """Length of the longest common subsequence (row-rolled DP)."""
+    if not a or not b:
+        return 0
+    prev = [0] * (len(b) + 1)
+    for x in a:
+        cur = [0] * (len(b) + 1)
+        for j, y in enumerate(b, 1):
+            cur[j] = prev[j - 1] + 1 if x == y else max(prev[j], cur[j - 1])
+        prev = cur
+    return prev[-1]
+
+
+def rouge_l(answers: List[str], output_text: str) -> float:
+    """ROUGE-L F-measure against the best-scoring reference. Returns [0,1]."""
+    pred = re.findall(r"\w+", output_text.lower())
+    if not pred:
+        return 0.0
+    best = 0.0
+    for a in answers:
+        gold = re.findall(r"\w+", (a or "").lower())
+        if not gold:
+            continue
+        l = _lcs(gold, pred)
+        if not l:
+            continue
+        p, r = l / len(pred), l / len(gold)
+        best = max(best, 2 * p * r / (p + r))
+    return best
+
+
 def score_request(answers: List[str], answer_type: str, output_text: str) -> bool:
     text = output_text.strip()
     if answer_type == "exact_match":
         # accept if any gold answer appears as a token-ish substring
         return any(re.search(rf"(?<!\d){re.escape(a)}(?!\d)", text) for a in answers)
+    if answer_type == "all_exact":
+        # RAG-Report: EVERY required answer must appear (digit-boundary match)
+        return all(re.search(rf"(?<!\d){re.escape(a)}(?!\d)", text) for a in answers)
     if answer_type == "recall":
         return all(a.lower() in text.lower() for a in answers)
     if answer_type == "f1":
@@ -34,6 +69,23 @@ def score_request(answers: List[str], answer_type: str, output_text: str) -> boo
             return False
         p, r = inter / max(len(pred), 1), inter / len(gold)
         return (2 * p * r / (p + r)) >= 0.5
+    if answer_type == "path_match":
+        # Repo-scale code analysis: the model must name the defining file.
+        # Accept the full path or its basename (models often drop directories).
+        low = text.lower()
+        for a in answers:
+            a = a.strip()
+            if not a:
+                continue
+            if a.lower() in low or a.split("/")[-1].lower() in low:
+                return True
+        return False
+    if answer_type == "rouge":
+        # ROUGE-L F-measure vs the reference summary, the standard LongBench
+        # metric for gov_report / qmsum / multi_news. Threshold 0.20: strong
+        # models score ~0.30-0.35 on these, near-zero when they summarise the
+        # wrong document, so it separates the failure we care about.
+        return rouge_l(answers, text) >= 0.20
     raise ValueError(f"unknown answer_type {answer_type!r}")
 
 

@@ -1,6 +1,8 @@
+# Kept for `pip install -r requirements.txt` compatibility; the supported path
+# is `pip install ".[hf]"` (see pyproject.toml), which also installs the
+# opendc-bench / opendc-data / opendc-analyze entry points.
+PyYAML>=6.0
 # Real-tokenizer path. The offline `--tokenizer char` smoke path needs none of these.
 transformers>=4.45.0
 tokenizers>=0.20.0
-PyYAML>=6.0
-# sentencepiece is pulled in by some tokenizers (e.g. Llama slow path)
 sentencepiece>=0.2.0

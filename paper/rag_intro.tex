@@ -1,0 +1,25 @@
+% Short industry-RAG intro paragraph. Drop in near Table~\ref{tab:rag} (results)
+% or at the end of subsec:workloads (methodology). Self-contained.
+\paragraph{Industry-RAG workloads.}
+Beyond the synthetic length/cache ladders, OpenDC-Infer-LC includes two workloads
+shaped like the retrieval traffic that dominates enterprise GenAI deployments.
+\textbf{RAG-TopK} reproduces vector-database top-$k$ retrieval: each request packs
+$64$ independently retrieved passages ($\approx$32K tokens) from \emph{different}
+documents, exactly one of which carries the answer while the other passages are
+\emph{hard distractors} in the identical format---the same near-duplicate, wrong-chunk
+noise a production retriever returns---and the retrieved set differs per query.
+\textbf{RAG-Report} reproduces long-form report generation, today's most common
+enterprise LLM task: a 32K multi-document context that must be synthesized into a
+structured $2048$-token answer reproducing five required facts. These are
+\emph{industry-representative} on three axes that toy long-context tests miss.
+\emph{(i)~Length and shape:} 32K is the realistic production RAG operating window
+(retrieval budgets, not 4--8K toys), and TopK's fragmented many-document prefill
+plus per-query-distinct passage sets reproduce the low cross-query cache reuse real
+retrievers exhibit---unlike a single shared haystack. \emph{(ii)~Correctness under
+distraction:} grading is exact-match against an answer embedded among same-format
+distractors, so a system is rewarded only for retrieving the \emph{right} chunk---the
+dominant real RAG failure mode, which raw-throughput benchmarks cannot see.
+\emph{(iii)~Both cost regimes:} TopK is prefill/retrieval-bound and Report is
+decode-bound on long structured output, the two regimes that jointly set the serving
+bill of a production RAG stack. Construction details are in
+Appendix~\ref{subsec:rag_details}.

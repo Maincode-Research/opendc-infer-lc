@@ -1,0 +1,49 @@
+% Multi-node scaling + routing ablation (AMD MI355X, Qwen3.5-35B-A3B,
+% data-parallel TP=8 replicas behind one production router).
+% Requires: \usepackage{booktabs}.
+% Throughput here is RAW SLO-qualified output tok/s (NOT quality-filtered): the
+% 35B fails the LC-Cache needle-recall guardrail (quality 0.2-0.6) uniformly
+% single-node AND multi-node, so the quality-filtered goodput is depressed by a
+% near-constant factor and would mask the scaling. Raw isolates the
+% router/replication effect; the guardrail failure is reported separately.
+% Efficiency(N) = raw(N) / (N * raw(1)), raw(1)=68.3 tok/s (single-node vLLM @C8).
+
+\begin{table}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}l r r r r@{}}
+    \toprule
+    & \multicolumn{2}{c}{\textbf{cache-aware}} & \multicolumn{2}{c}{\textbf{round-robin}} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    \textbf{N (GPUs)} & raw tok/s & Eff($N$) & raw tok/s & Eff($N$) \\
+    \midrule
+    1 \ (8)   & 68.3 & 1.00 & 68.3 & 1.00 \\
+    2 \ (16)  & ---  & ---  & 136.5 & \textbf{1.00} \\
+    4 \ (32)  & 68.3 & 0.25 & \textbf{204.8} & 0.75 \\
+    8 \ (64)  & 68.3 & 0.13 & ---  & ---  \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{Multi-node scaling and routing ablation} on LC-Cache (the
+  single byte-identical 32K shared-prefix workload), Qwen3.5-35B-A3B,
+  data-parallel TP$=$8 vLLM replicas behind one production router (sgl-router).
+  Values are peak SLO-qualified \emph{raw} output throughput (tok/s);
+  $\text{Eff}(N)=\text{raw}(N)/(N\cdot\text{raw}(1))$ with $\text{raw}(1){=}68.3$
+  (single-node @C$^\star{=}8$); the router adds negligible overhead at $N{=}1$.
+  We report \emph{raw} rather than quality-filtered goodput because the 35B fails
+  the LC-Cache needle-recall guardrail (quality $0.2$--$0.6$) uniformly, on
+  single-node as well, so the filter would hide the scaling behind a
+  near-constant quality factor (full per-point goodput \emph{and} quality are in
+  App.~\ref{tab:full-matrix-mn}). The routing policy dominates scaling because the
+  workload has a \emph{single} shared prefix: \textbf{cache-aware} routes by prefix
+  and pins essentially all traffic to one replica---throughput stays at the
+  single-replica $68.3$ for every $N$, i.e.\ $\text{Eff}(N)\!=\!1/N$ ($0.25$ at
+  $N{=}4$, $0.13$ at $N{=}8$). \textbf{Round-robin} spreads load and scales
+  near-linearly: $\text{Eff}{=}1.00$ at $N{=}2$ ($136.5{=}2\times$) and $0.75$ at
+  $N{=}4$ ($204.8{=}3\times$), at the cost of redundant per-replica prefix prefill
+  (and no prefix-cache reuse). LC-32K (distinct per-request prefixes) qualified
+  only at concurrency~1 ($\approx17$\,tok/s) under both policies once routed, as
+  router-side latency pushed higher-concurrency points past the TTFT/E2E SLO.
+  This is the cache-locality vs.\ load-balance tradeoff: prefix-aware routing
+  maximizes hit-rate but, on shared-prefix traffic, defeats data-parallel scaling.}
+  \label{tab:scaling}
+\end{table}

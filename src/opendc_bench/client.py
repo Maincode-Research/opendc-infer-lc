@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -33,6 +34,13 @@ class StreamClient:
         self.model = model
         self.tok = tokenizer
         self.timeout = request_timeout
+        # OPENDC_NO_THINK=1 disables a reasoning model's <think> phase so it emits
+        # the answer directly (fair short-answer comparison vs non-thinking
+        # models). Forwarded to vLLM/SGLang via the OpenAI chat_template_kwargs.
+        self.extra_body = (
+            {"chat_template_kwargs": {"enable_thinking": False}}
+            if os.environ.get("OPENDC_NO_THINK") else {}
+        )
 
     async def _read_headers(self, reader: asyncio.StreamReader):
         status_line = await reader.readline()
@@ -77,6 +85,7 @@ class StreamClient:
             "temperature": 0.0,
             "top_p": 1.0,
             "stream": True,
+            **self.extra_body,
         }).encode("utf-8")
         req = (
             f"POST {self.path} HTTP/1.1\r\n"

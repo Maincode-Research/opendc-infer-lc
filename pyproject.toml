@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opendc-infer-lc"
+version = "0.2.0"
+description = "OpenDC-Infer-LC: a hardware- and backend-neutral benchmark for long-context and RAG inference serving (SLO-qualified goodput)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+keywords = ["benchmark", "inference", "long-context", "rag", "llm-serving", "vllm", "sglang", "slo", "goodput"]
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Benchmark",
+]
+
+# The harness itself is pure stdlib. Only the dataset *builder* needs YAML,
+# and only the real-tokenizer path needs transformers (extra: [hf]).
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+hf = ["transformers>=4.45.0", "tokenizers>=0.20.0", "sentencepiece>=0.2.0"]
+dev = ["pytest>=7", "build>=1.0"]
+
+[project.scripts]
+opendc-bench = "opendc_bench.cli:main"
+opendc-data = "opendc_data.cli:main"
+opendc-analyze = "opendc_bench.analyze:main"
+
+[project.urls]
+Homepage = "https://github.com/MaincodeHQ/opendc-infer-lc"
+Source = "https://github.com/MaincodeHQ/opendc-infer-lc"
+
+[tool.setuptools]
+package-dir = { "opendc_bench" = "src/opendc_bench", "opendc_data" = "src/opendc_data", "opendc_data.configs" = "configs" }
+packages = ["opendc_bench", "opendc_data", "opendc_data.configs"]
+
+[tool.setuptools.package-data]
+"opendc_data.configs" = ["*.yaml"]

@@ -1,0 +1,14 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented \textbf{OpenDC-Infer-LC}, an open, hardware-neutral benchmark that
+measures long-context and RAG inference serving as \emph{SLO-qualified goodput}
+over the full serving system, rather than as peak tokens per second. Across two MoE
+tiers, two vendors (AMD MI355X and NVIDIA B200), four backends, three precisions,
+and up to 64 GPUs, one message holds: \emph{serving capacity is governed by where
+the prefill and tail-latency bottlenecks fall, and by the maturity of the serving
+stack---backend, quantization kernel, and routing policy---far more than by raw
+accelerator FLOPS}. The same metric also exposes wins that raw throughput hides,
+such as a small MoE that is fast but answers cached-RAG queries incorrectly. We
+release the reference harness, the frozen hash-pinned prompt sets, and the exact
+cluster run scripts so that every result is reproducible.

@@ -1,0 +1,119 @@
+% Appendix subsection: industry-RAG workload construction details.
+% Belongs under sec:protocol_appendix (after subsec:corpus_details). Extends the
+% generic needle-template description with the two retrieval-shape workloads.
+% Requires: \usepackage{booktabs}.
+\subsection{Industry-RAG Workload Construction}
+\label{subsec:rag_details}
+The two retrieval-shape workloads reuse the seeded synthetic corpus generator and
+``magic number'' needle template of Appendix~\ref{subsec:corpus_details}, but
+assemble it into the shapes real RAG traffic takes. Both are released with the
+benchmark and pinned by the same \texttt{dataset\_version\_hash}; all token counts
+are measured with each model's own tokenizer at build time and stored per record.
+
+\paragraph{RAG-TopK (vector-DB retrieval).}
+Each request emulates the prompt a retrieval-augmented system sends after a top-$k$
+vector search. We synthesize $k{=}64$ independent ``passages'' of $\approx$512
+tokens each, drawn from distinct seeded document streams, and concatenate them under
+a retrieval instruction header with a question footer---fitting the total to
+\textbf{32{,}768 tokens exactly} (achieved mean $32{,}765$, range $32{,}761$--$32{,}767$
+over $600$ samples). Exactly one passage contains the answer needle (a distinctive
+magic-number statement); \textbf{seven} additional passages carry \emph{same-format
+distractor} needles with different magic numbers, so a model cannot succeed by
+pattern-matching the needle template---it must retrieve the \emph{correct} value.
+The eight needles are placed at five evenly spread document depths
+($0,\,0.25,\,0.5,\,0.75,\,1.0$) so the answer is not biased toward the
+recency/primacy positions, and the passage ordering and answer slot are reseeded
+per request, giving a \emph{per-query-distinct} prompt with low cross-request prefix
+overlap. Output is capped at $256$ tokens and graded by \texttt{exact\_match} on the
+magic number. RAG-TopK therefore stresses \emph{fragmented} prefill (64 short
+unrelated segments rather than one contiguous context) and \emph{cache-unfriendly}
+serving (each query's retrieved set differs), which is exactly where prefix-cache
+and prefix-aware routing assumptions break down.
+
+\paragraph{RAG-Report (long-form synthesis).}
+Each request is a 32K-token multi-document context (achieved mean $32{,}766$, range
+$32{,}763$--$32{,}767$ over $200$ samples) containing $n{=}5$ required facts
+(magic-number needles) scattered across the documents, with an instruction to
+produce a structured report. The model must emit a \emph{long} answer (up to
+$2048$ tokens) and the report is graded by \texttt{all\_exact}: the score is $1$
+only if \emph{all five} required facts appear correctly (with digit-boundary
+matching to avoid spurious substring hits), and $0$ otherwise. This makes the
+workload decode-bound---it is the only workload that routinely reaches the
+long-generation tail---and tests whether a serving stack sustains per-token latency
+across thousands of output tokens under load, the regime that governs report,
+summary, and analyst-style enterprise tasks.
+
+\paragraph{Service-level objectives.}
+RAG-TopK is served under the \emph{interactive} profile
+(Table~\ref{tab:slo}; TTFT $<3$\,s, TPOT $<120$\,ms, E2E $<60$\,s, success $>99\%$),
+matching an interactive retrieval assistant. RAG-Report is served under a dedicated
+\emph{generation} profile (TTFT $<10$\,s, TPOT $<200$\,ms, E2E $<300$\,s,
+success $>98\%$) that admits the longer end-to-end time a $2048$-token answer
+requires while still bounding per-token latency, so quality and tail latency---not
+just raw tokens/s---decide whether a configuration qualifies.
+
+\paragraph{Why synthetic, and what it controls for.}
+Procedural generation from a fixed seed (never public documents) is what makes these
+retrieval shapes a clean serving measurement rather than a knowledge test:
+distractors are guaranteed format-identical and semantically empty, so a wrong
+answer reflects retrieval/attention failure under load and not missing world
+knowledge or training-data contamination; passages are unique, so prefix-cache hit
+rates are not inflated by an accidentally repeated real passage; and the corpus is
+license-clean and bit-for-bit reproducible across sites. The released parameters
+(passage count, distractor count, depths, target length, sample count) are the knobs
+a practitioner can rescale to their own retrieval budget without changing the harness.
+
+\begin{table}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}l r r@{}}
+    \toprule
+    \textbf{Parameter} & \textbf{RAG-TopK} & \textbf{RAG-Report} \\
+    \midrule
+    Target input tokens        & 32{,}768 & 32{,}768 \\
+    Achieved mean (range)      & 32{,}765 ($\pm$3) & 32{,}766 ($\pm$3) \\
+    Retrieved passages $k$     & 64 ($\approx$512 tok) & --- (multi-doc) \\
+    Answer needle              & 1 & --- \\
+    Distractor needles         & 7 (same format) & --- \\
+    Required facts             & --- & 5 \\
+    Needle depths              & $\{0,.25,.5,.75,1\}$ & scattered \\
+    Max output tokens          & 256 & 2048 \\
+    Samples                    & 600 & 200 \\
+    Scoring                    & \texttt{exact\_match} & \texttt{all\_exact} \\
+    SLO profile                & interactive & generation \\
+    \bottomrule
+  \end{tabular}
+  \caption{Industry-RAG workload parameters (released with the benchmark, pinned by
+  \texttt{dataset\_version\_hash}). Token counts are measured per record with the
+  served model's tokenizer.}
+  \label{tab:rag-params}
+\end{table}
+
+\paragraph{Public real-text workloads (external validity).}
+The synthetic shapes above buy control (no contamination, exact lengths,
+uninflated cache rates) at the cost of external validity. To show the findings are
+not artefacts of synthetic text, we add two workloads built from
+\textbf{LongBench}\footnote{Bai et al., \emph{LongBench: A Bilingual, Multitask
+Benchmark for Long Context Understanding}, ACL 2024.
+\url{https://huggingface.co/datasets/zai-org/LongBench}. Swap this footnote for
+\texttt{\textbackslash cite\{bai2024longbench\}} once a bibliography is wired; the
+entry is provided in \texttt{rag\_refs.bib}.}, the standard public long-context
+suite, using its own token-F1 metric (\texttt{answer\_type{=}f1}, threshold $0.5$).
+\textbf{RAG-RealQA} draws from LongBench \emph{HotpotQA} (real multi-hop questions
+over real Wikipedia passages, short factual answers); \textbf{RAG-SciQA} draws from
+LongBench \emph{QASPER} (questions over real NLP research papers, including
+abstractive and unanswerable cases) to cover a non-Wikipedia technical domain.
+Each instance keeps its source example's full context as the answerable core,
+placed \emph{first}, and is then packed with additional \emph{real} passages
+sampled from other documents in the same corpus until it reaches the $32$K budget;
+the exact-length truncation therefore only trims appended distractors (never the
+gold context), and the question is appended after truncation so it is always
+present. This makes them the recognized-benchmark, real-text analogue of RAG-TopK:
+many real documents, one answerable, graded on whether the model retrieves the
+right answer under load. We release $200$ instances per workload (the LongBench
+test-split size for each task), built per served-model tokenizer to the same exact
+$32$K length as the synthetic workloads. The single caveat is the dual of the
+synthetic corpus's: because LongBench is public, the served models may have seen
+these questions in pre-training, so RAG-RealQA/SciQA quality is an
+\emph{external-validity cross-check} on real text rather than a contamination-free
+measurement---the two corpus families are complementary by design.

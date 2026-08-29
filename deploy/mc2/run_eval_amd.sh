@@ -52,7 +52,7 @@ fi
 
 # Container images (ROCm / gfx950). Harness runs in the proven vLLM image.
 VLLM_IMAGE="${VLLM_IMAGE:-docker.io/rocm/vllm:rocm7.13.0_gfx950-dcgpu_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1}"
-SGLANG_IMAGE="${SGLANG_IMAGE:-docker.io/lmsysorg/sglang:v0.5.9-rocm700-mi35x}"
+SGLANG_IMAGE="${SGLANG_IMAGE:-docker.io/lmsysorg/sglang-rocm:v0.5.12.post1-rocm700-mi35x-20260526}"
 TGI_IMAGE="${TGI_IMAGE:-ghcr.io/huggingface/text-generation-inference:latest-rocm}"  # NB: confirm a valid ROCm tag; gfx950 support unverified
 BENCH_IMAGE="${BENCH_IMAGE:-$VLLM_IMAGE}"      # the harness needs only transformers+stdlib
 
@@ -148,6 +148,15 @@ for i in $(seq 1 480); do
   sleep 10
 done
 
+# prime the server: the first inference can trigger kernel/graph compilation
+# (esp. SGLang) that would otherwise consume the first workload's timed window.
+echo "[warmup] priming first-request compile ..."
+for _ in 1 2; do
+  curl -fsS "http://127.0.0.1:$PORT/v1/chat/completions" -H 'Content-Type: application/json' \
+    -d "{\"model\":\"$SERVED\",\"messages\":[{\"role\":\"user\",\"content\":\"warm up\"}],\"max_tokens\":8}" \
+    >/dev/null 2>&1 || true
+done
+
 DSHASH=$(python3 -c "import json;print(json.load(open('$SHARED/data/$DATASET/MANIFEST.json'))['dataset_version_hash'])" 2>/dev/null||echo "")
 cat > "$OUT/run_meta.json" <<JSON
 {"model":"$SERVED","model_path":"$MODEL_PATH","backend":"$BACKEND","tp":$TP,
@@ -161,6 +170,7 @@ JSON
 podman run --rm "${ROCM_FLAGS[@]}" \
   -v "$SHARED:$SHARED" -v "${MODEL_PATH}:${MODEL_PATH}:ro" \
   -e PYTHONPATH="$SHARED/src" -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 \
+  -e OPENDC_NO_THINK="${OPENDC_NO_THINK:-}" \
   "$BENCH_IMAGE" \
   bash -lc "
     for w in $WORKLOADS; do

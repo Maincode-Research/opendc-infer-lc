@@ -1,0 +1,163 @@
+% Results and Analysis. Requires the main table (Table~\ref{tab:main}), the
+% scaling table (Table~\ref{tab:scaling}), and the appendix full matrices
+% (tab:single-node-235b, tab:full-matrix-35b, tab:full-matrix-b200).
+
+\section{Results and Analysis}
+\label{sec:results}
+
+Table~\ref{tab:main} reports single-node SLO-qualified goodput for both models on
+both vendors; Table~\ref{tab:scaling} reports multi-node scaling; the full
+per-load-point matrices are in the appendix. Read together, the runs tell a
+consistent story that we organize as five insights. The recurring theme is that
+\emph{long-context serving capacity is governed by where the prefill and
+tail-latency bottlenecks fall and by the maturity of the serving stack, far more
+than by raw accelerator FLOPS}---and that ranking on SLO-qualified goodput, rather
+than raw throughput, is what makes these effects visible.
+
+\subsection{Sparsity buys concurrency, not a faster request}
+\label{subsec:insight-concurrency}
+The headline gap between the tiers is enormous---at LC-8K the 35B-A3B reaches
+$1451$\,tok/s (SGLang) against $31$ for the 235B-A22B, a $\sim$47$\times$ ratio,
+mirrored by vLLM ($952$ vs.\ $22$)---but it is \emph{not} a faster request. At
+concurrency~1 the per-stream rates differ by only $\sim$2$\times$ ($30.7$ vs.\
+$14.7$\,tok/s, vLLM). The entire remaining gap is \textbf{SLO-qualified
+concurrency}: the 22\,B-active 235B violates the $120$\,ms TPOT bound by
+concurrency~4 (TPOT$_{p95}{=}153$\,ms), capping at $\text{C}^\star{=}2$, whereas
+the 3\,B-active 35B holds TPOT$_{p95}\!\leq\!67$\,ms to concurrency~64---a
+$32\times$ larger batch inside the same tail-latency envelope. The practical
+reading is that MoE sparsity is a \emph{batchability} lever: it does little for
+single-request latency but makes batched decode far cheaper, which under a
+tail-latency SLO converts directly into order-of-magnitude interactive capacity
+per node (at the cost of headline quality, \S\ref{subsec:insight-goodput}). This
+also explains the energy column: because mean power varies little across configs
+($340$--$534$\,W), tokens/joule tracks goodput, so the most batchable
+configuration (SGLang) is also the most energy-efficient ($0.419$ vs.\ $0.100$
+tok/J on the 35B LC-Cache).
+
+\subsection{Long-context serving is prefill-bound, and the wins are in scheduling and reuse}
+\label{subsec:insight-prefill}
+Three otherwise-unrelated results share one cause---prefill, not decode, is the
+long-context bottleneck. (i)~\textbf{The ``128K wall'' is a scheduling property.}
+SGLang is the only backend to satisfy the heavy SLO at LC-128K, on both the 235B
+($0.9$\,tok/s) and the 35B ($257$ at C$^\star{=}16$); vLLM fails LC-128K on both. The cause is
+prefill latency: vLLM's 128K TTFT$_{p95}\!\approx\!20$\,s exceeds the $10$\,s
+bound, while SGLang's chunked prefill brings it to $\approx7$\,s. (ii)~\textbf{The
+value of a prefix cache scales with how prefill-bound the model is.} Disabling the
+prefix cache (cold vs.\ warmed) collapses LC-Cache goodput $\sim$15$\times$ on the
+235B ($\approx47\!\to\!3$) but only $\sim$1.1$\times$ on the 35B ($34\!\to\!30$):
+the 3\,B-active model re-prefills a 32K context so cheaply that caching saves
+little, while the 22\,B-active model is prefill-bound and benefits enormously.
+(iii)~\textbf{Faster prefill silicon clears the wall:} on B200, vLLM \emph{does}
+qualify LC-128K ($\approx1.2$, Table~\ref{tab:main}) where it failed on MI355X---a
+prefill-FLOPS effect. The unifying lesson is that long-context throughput is won by
+attacking prefill (chunked-prefill scheduling, prefix reuse, prefill FLOPS), and
+that graph capture---which optimizes only the decode launch path---cannot help
+here; indeed, enabling HIP graphs on gfx950 \emph{regressed} throughput and failed
+to complete the long-context ladders, so all AMD numbers use eager mode.
+
+\subsection{The serving stack dominates the hardware}
+\label{subsec:insight-stack}
+Holding the model and GPU fixed, the software choices move goodput more than the
+silicon does. \textbf{Backend:} SGLang beats vLLM on every workload of both models.
+\textbf{Precision:} \emph{dynamic} FP8 \emph{lowers} goodput while preserving
+quality (235B: $16.8$ vs.\ $22.2$ at LC-8K; 35B at TP1: $149$ vs.\ $195$) and has
+the worst tokens/joule in the table---its on-the-fly dequantization is not
+amortized---whereas \textbf{offline MXFP4} (AMD Quark) on the 235B \emph{matches}
+BF16 goodput at $\sim$9\% lower power, the best tokens/joule among the vLLM
+precisions ($0.110$ vs.\ $0.098$). So block-FP4 from a pre-quantized checkpoint, not
+dynamic FP8, is the FP4 efficiency lever. \textbf{Routing:} for multi-node
+scale-out the routing \emph{policy}, not the GPU count, governs the result
+(Table~\ref{tab:scaling}). On the single-shared-prefix LC-Cache workload,
+cache-aware routing keys on the prefix and pins essentially all traffic to one
+replica---throughput stays at the single-replica $68.3$\,tok/s for every $N$, i.e.\
+$\text{Efficiency}(N){=}1/N$ ($0.25$ at $N{=}4$, $0.13$ at $N{=}8$)---while
+round-robin spreads load and scales near-linearly ($1.00$ at $N{=}2$, $0.75$ at
+$N{=}4$), at the cost of redundant per-replica prefix prefill. This is a concrete
+cache-locality vs.\ load-balance tradeoff that no single policy resolves, arguing
+for routers that shard distinct prefixes while replicating hot ones. Finally,
+\textbf{stack maturity} is itself a first-order variable: TGI's ROCm images did not
+serve gfx950, the vLLM fused-MoE MXFP4 loader could not read the 35B checkpoint, and
+the 235B's dual-chunk 1M context did not load on ROCm---each a coverage gap that
+bounds what the hardware can be asked to do today.
+
+\subsection{SLO-qualified goodput exposes wins that raw throughput hides}
+\label{subsec:insight-goodput}
+Two results justify ranking on quality-gated, SLO-qualified goodput rather than raw
+tokens/s. First, the 35B is fast but \emph{wrong} on cached RAG: it is
+latency-SLO-qualified on LC-Cache yet \textbf{fails the needle-recall guardrail}
+(QualityRatio $0.2$--$0.6$ vs.\ $1.0$ for the 235B), uniformly on single-node and
+multi-node and independent of concurrency---the 3\,B-active model serves the 32K
+shared-prefix queries quickly but answers the embedded needle incorrectly most of
+the time. Raw throughput would reward this; quality-gated goodput does not, so we
+report the 35B LC-Cache figures as valid-only (marked $\ddagger$ in
+Table~\ref{tab:main}). Second, the same gate clarifies scaling: the round-robin
+\emph{raw} throughput scales cleanly ($136.5\!\to\!204.8$ tok/s from $N{=}2$ to
+$4$), but the quality factor is what we must report alongside it. The broader point
+is that for the small MoE the speed-vs-quality tradeoff is not hypothetical---it is
+the difference between a leaderboard-topping number and a usable system---and the
+metric design is what surfaces it. The two retrieval-shape workloads
+(Table~\ref{tab:rag}) make the same point on \emph{realistic} RAG. On RAG-TopK the
+35B's throughput batches well ($17\!\to\!83$\,tok/s raw to C$^\star{=}8$) but it
+answers only $\sim$20\% correctly (quality $0.17$--$0.21$ across both backends),
+retrieving the wrong magic number from among the distractor passages, whereas the
+235B is correct (quality $1.00$) at a far lower $3.6$--$5.4$\,tok/s (prefill-bound at
+32K). Crucially, even the 35B's \emph{quality-gated} goodput ($17$) exceeds the
+235B's ($3.6$--$5.4$): neither raw \emph{nor} quality-gated goodput rejects a model
+that is wrong $\sim$80\% of the time---only the separately reported quality score
+does, which is the strongest argument for treating quality as a first-class metric.
+RAG-Report, by contrast, is answered correctly by both tiers but is decode-bound,
+and exposes a $\sim$50$\times$ \emph{backend} gap in long-output batching: 35B SGLang
+reaches $501$\,tok/s at C$^\star{=}32$ while 35B vLLM stalls at $10$ (C$^\star{=}1$).
+The two workloads thus separate a \emph{retrieval-accuracy} failure from a
+\emph{decode-capacity} limit---distinct dimensions that raw tokens/s conflates.
+
+\paragraph{External validity on public real-text QA.}
+Because the synthetic corpus buys control at the cost of realism, we repeat the
+retrieval comparison on two public LongBench workloads---real Wikipedia
+multi-document QA (RAG-RealQA, HotpotQA) and scientific-paper QA (RAG-SciQA,
+QASPER), graded by token-F1 (Table~\ref{tab:realqa})---and they sharpen, rather than
+contradict, the quality argument. First, \emph{the synthetic needle test overstates
+retrieval quality}: the 235B scores F1$=1.0$ on synthetic RAG-TopK but only $0.58$
+on real Wikipedia QA and $0.25$ on scientific QA, so a leaderboard built only on
+synthetic exact-match would report a quality ceiling that real traffic never
+reaches---direct evidence that quality must be measured on real corpora, not just
+controlled ones. Second, \emph{the quality ordering between tiers is
+workload-dependent}: on real multi-hop QA the smaller 35B is actually
+competitive-to-better (F1 $0.73$--$0.75$ vs.\ $0.57$--$0.58$ once its reasoning mode
+is disabled so the short-answer budget is not spent on \texttt{<think>} tokens),
+inverting the large synthetic-RAG-TopK gap, while scientific QA is hard for both
+tiers ($0.16$--$0.28$). The synthetic ``fast-but-wrong'' separation is therefore
+specific to \emph{adversarial same-format needle} retrieval and does not
+generalize to all real RAG; the throughput story is unchanged (the more batchable
+35B sustains higher goodput, the prefill-bound 235B caps at C$^\star{=}1$). The
+practical lesson reinforces the metric design: quality is first-class \emph{and}
+corpus-dependent, so a serving benchmark must pair controlled synthetic shapes with
+public real-text workloads to avoid both contamination and over-optimism.
+
+\subsection{The cross-vendor verdict is workload-dependent}
+\label{subsec:insight-crossvendor}
+Running the 235B on NVIDIA B200 with the identical harness
+(Table~\ref{tab:main}) yields no single ordering. B200 raises the short/medium
+workloads (vLLM LC-8K $22.2\!\to\!36.4$, LC-32K $3.6\!\to\!7.2$) and, as above,
+uniquely qualifies LC-128K on every backend---faster prefill under the same SLO.
+But on the cached-RAG workload the ranking flips: the best MI355X config (SGLang,
+$99.6$) beats both B200 vLLM and B200 SGLang ($\approx64$), and only B200's
+CUDA-only TensorRT-LLM surpasses it ($129.9$). The likely cause is memory capacity:
+MI355X carries $288$\,GB HBM3E/GPU against B200's $\sim$192\,GB, giving a larger
+resident KV/prefix-cache budget---exactly what LC-Cache rewards. The vendor verdict
+is therefore per-workload: B200 for prefill-heavy and ultra-long context, MI355X
+competitive-to-better for cached RAG, with the CUDA-only stack (TensorRT-LLM) the
+LC-Cache leader where it is available.
+
+\paragraph{Caveats.}
+Several capacity points sit at the first ladder rung (e.g.\ LC-32K on the 235B
+qualifies only at concurrency~1), so absolute goodput there is small and
+prefill-dominated; we report run-to-run variance for boundary points. The 35B
+precision comparison is at $\text{TP}{=}1$ (the 35B's multimodal vision-encoder MLP
+width, $4304$, is not 16-divisible after an 8-way shard, which dynamic FP8 rejects),
+so it should be read against the 35B TP1 BF16 row.
+B200 power telemetry was not collected, so its energy columns are unavailable, and
+the cross-vendor comparison assumes each platform at its best-performing
+configuration (eager on AMD, since graphs regressed there). Finally, the 35B
+LC-Cache guardrail failure is treated as a reported result, not grounds for
+discarding the runs.

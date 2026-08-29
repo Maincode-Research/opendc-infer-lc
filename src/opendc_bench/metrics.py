@@ -40,6 +40,9 @@ class SLOProfile:
 # Table 2.
 INTERACTIVE = SLOProfile("interactive_rag", 3.0, 0.120, 60.0, 0.99)
 HEAVY = SLOProfile("heavy_long_context", 10.0, 0.200, 180.0, 0.98)
+# Generation profile: long-output workloads keep the per-token (TPOT) bound but
+# relax end-to-end to admit thousands of output tokens.
+GENERATION = SLOProfile("generation_long_output", 10.0, 0.200, 300.0, 0.98)
 
 # Workload -> profile (spec 2.5).
 WORKLOAD_PROFILE: Dict[str, SLOProfile] = {
@@ -52,6 +55,11 @@ WORKLOAD_PROFILE: Dict[str, SLOProfile] = {
     "lc_512k": HEAVY,
     "lc_960k": HEAVY,
     "lc_1m": HEAVY,
+    # industry RAG shapes
+    "rag_topk": INTERACTIVE,   # ~16K retrieved context, short answer
+    "rag_report": GENERATION,  # long structured output
+    "rag_realqa": INTERACTIVE, # public real multi-doc QA (LongBench HotpotQA), short answer
+    "rag_sciqa": INTERACTIVE,  # public scientific-paper QA (LongBench QASPER), short answer
 }
 
 

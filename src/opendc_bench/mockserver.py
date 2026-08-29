@@ -14,7 +14,8 @@ import re
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-CFG = {"ttft": 0.05, "tpot": 0.005, "n_tokens": 16, "oracle": True}
+CFG = {"ttft": 0.05, "tpot": 0.005, "n_tokens": 16, "oracle": True,
+       "model": "opendc-mock"}
 
 
 def _oracle_answer(prompt: str) -> str:
@@ -31,6 +32,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, *a):  # silence
         pass
+
+    def handle_one_request(self):
+        # A load generator that closes a stream early (ladder step finished,
+        # timeout, cancellation) is normal; do not spew tracebacks for it.
+        try:
+            super().handle_one_request()
+        except (ConnectionResetError, BrokenPipeError):
+            self.close_connection = True
+
+    def do_GET(self):
+        """Health/discovery surface so the suite runner can wait on and
+        auto-detect this endpoint exactly as it would a real server."""
+        if self.path.rstrip("/") in ("/v1/models", "/models"):
+            body = json.dumps({"object": "list", "data": [
+                {"id": CFG["model"], "object": "model", "owned_by": "opendc-mock"}]}).encode()
+        elif self.path.rstrip("/") == "/health":
+            body = b"ok"
+        else:
+            self.send_response(404); self.send_header("Content-Length", "0"); self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _chunk(self, data: bytes):
         self.wfile.write(f"{len(data):x}\r\n".encode())
@@ -53,14 +79,23 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Transfer-Encoding", "chunked")
         self.end_headers()
 
-        time.sleep(CFG["ttft"])  # simulated TTFT
-        for i, tok in enumerate(tokens):
-            if i > 0:
-                time.sleep(CFG["tpot"])
-            delta = {"choices": [{"delta": {"content": tok}}]}
-            self._chunk(f"data: {json.dumps(delta)}\n\n".encode())
-        self._chunk(b"data: [DONE]\n\n")
-        self._chunk(b"")  # terminating 0-length chunk
+        try:
+            time.sleep(CFG["ttft"])  # simulated TTFT
+            for i, tok in enumerate(tokens):
+                if i > 0:
+                    time.sleep(CFG["tpot"])
+                delta = {"choices": [{"delta": {"content": tok}}]}
+                self._chunk(f"data: {json.dumps(delta)}\n\n".encode())
+            self._chunk(b"data: [DONE]\n\n")
+            self._chunk(b"")  # terminating 0-length chunk
+        except (ConnectionResetError, BrokenPipeError):
+            self.close_connection = True  # client hung up mid-stream
+
+
+def serve(port: int = 8000, **cfg) -> ThreadingHTTPServer:
+    """Create (but do not run) a mock server; caller drives serve_forever()."""
+    CFG.update(cfg)
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
 
 def main():
@@ -73,7 +108,7 @@ def main():
     args = ap.parse_args()
     CFG.update(ttft=args.ttft, tpot=args.tpot, n_tokens=args.n_tokens,
                oracle=not args.no_oracle)
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    srv = serve(args.port)
     print(f"mock server on http://127.0.0.1:{args.port}  cfg={CFG}")
     srv.serve_forever()
 

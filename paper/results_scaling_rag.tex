@@ -1,0 +1,68 @@
+% Multi-node RAG scaling (AMD MI355X, data-parallel TP=8 replicas behind one
+% sgl-router). Two panels: (A) RAG-TopK as Efficiency(N) -- prefill-bound, so it
+% scales near-linearly and exposes the routing-policy effect; (B) RAG-Report as
+% goodput@C* growth -- single-node is TPOT-SLO-capped at low concurrency, so
+% replication's win is *unlocking concurrency*, not raw efficiency.
+% 235B values are SLO-qualified goodput (quality=1.0 -> goodput=raw); 35B values
+% are RAW throughput (the 35B fails the needle/answer quality guardrail, q~0.15 on
+% RAG-TopK, so quality-gated goodput would be near zero -- raw isolates the
+% serving behaviour). Requires booktabs.
+\begin{table}[t]
+  \centering
+  \small
+  % --- Panel A: RAG-TopK, Efficiency(N) ------------------------------------
+  \begin{tabular}{@{}l r r r r@{}}
+    \multicolumn{5}{c}{\textbf{(A) RAG-TopK} --- Efficiency$(N)$, 235B-A22B (q$=$1.0)} \\
+    \toprule
+    & \multicolumn{2}{c}{\textbf{cache-aware}} & \multicolumn{2}{c}{\textbf{round-robin}} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    \textbf{N (GPUs)} & tok/s & Eff$(N)$ & tok/s & Eff$(N)$ \\
+    \midrule
+    1 \ (8)   & 3.5  & 1.00 & 3.5  & 1.00 \\
+    2 \ (16)  & \textbf{8.1} & \textbf{1.16} & 7.9 & 1.13 \\
+    4 \ (32)  & \textbf{17.4} & \textbf{1.25} & 13.9 & 1.00 \\
+    \bottomrule
+  \end{tabular}
+
+  \medskip
+  % --- Panel B: RAG-Report, goodput@C* -------------------------------------
+  \begin{tabular}{@{}l r r r r@{}}
+    \multicolumn{5}{c}{\textbf{(B) RAG-Report} --- goodput$_{\,\text{C}^\star}$ (tok/s)} \\
+    \toprule
+    & \multicolumn{2}{c}{\textbf{235B-A22B}} & \multicolumn{2}{c}{\textbf{35B-A3B (raw)}} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    \textbf{N (GPUs)} & cache & round-robin & cache & round-robin \\
+    \midrule
+    1 \ (8)   & 25.1$_{2}$  & 25.1$_{2}$  & 14.4$_{1}$  & 14.4$_{1}$ \\
+    2 \ (16)  & 53.2$_{4}$  & 49.2$_{4}$  & 250$_{32}$  & 249$_{32}$ \\
+    4 \ (32)  & 718$_{64}$  & 176$_{16}$  & 355$_{64}$  & \textbf{567}$_{128}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{\textbf{Multi-node RAG scaling} on AMD MI355X, data-parallel TP$=$8
+  replicas behind one production router (sgl-router); $N$ is the replica count
+  ($8N$ GPUs). \textbf{(A)~RAG-TopK is prefill/retrieval-bound}, so it scales
+  near-linearly and \emph{both} routing policies hold $\text{Eff}(N)\!\approx\!1$
+  ($\text{Eff}(N)=\text{tok/s}(N)/(N\cdot\text{tok/s}(1))$, 235B SLO-qualified
+  goodput). This is the key contrast with the single-shared-prefix LC-Cache
+  workload (Table~\ref{tab:scaling}), where cache-aware routing pinned all traffic
+  to one replica and collapsed to $\text{Eff}{=}1/N$: RAG-TopK's
+  \emph{per-query-distinct} retrieved sets give the prefix router nothing to pin on,
+  so cache-aware no longer defeats data-parallel scaling. The 35B is omitted from
+  panel~A: under routing it fails the interactive TTFT bound by $N{=}2$
+  (TTFT$_{p95}\,{\approx}\,4.2$\,s\,$>$\,3\,s) and answers only $\sim$15\%
+  correctly, so it neither scales nor qualifies on real-shaped retrieval QA.
+  \textbf{(B)~RAG-Report is TPOT-SLO-capped at a single node} (the 235B qualifies
+  only to C$^\star{=}2$, the 35B to C$^\star{=}1$, because per-token latency
+  crosses the bound at higher load), so the win from replication is
+  \emph{unlocking qualifying concurrency}: goodput grows steeply with $N$ for both
+  models (235B $25\!\to\!718$, 35B $14\!\to\!567$) as the router spreads requests
+  and each replica stays inside the TPOT budget. We report goodput$_{\,\text{C}^\star}$
+  rather than Efficiency here because dividing by the latency-capped single-node
+  peak would report a meaningless $7\text{--}10\times$. At $N{=}4$ the cache-vs-round-robin
+  ordering is \emph{not} robust---it inverts between models (235B favours
+  cache-aware, 35B favours round-robin)---because these points sit on the TPOT-SLO
+  boundary where small tail-latency variance flips which concurrency rung
+  qualifies; we therefore draw no routing-policy conclusion from panel~B.
+  Per-load-point detail is in App.~\ref{tab:full-scaling-rag}.}
+  \label{tab:scaling-rag}
+\end{table}

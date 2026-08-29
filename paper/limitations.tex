@@ -1,0 +1,21 @@
+\section{Limitations}
+\label{sec:limitations}
+
+Our study is bounded in four ways. \textbf{(1) Stack maturity.} The AMD results use
+a new accelerator (CDNA4 / gfx950) on a young ROCm software stack; several
+configurations did not run and are reported as explicit coverage gaps rather than
+omitted---TGI does not serve gfx950, the vLLM fused-MoE MXFP4 loader cannot read the
+35B checkpoint, the 235B's dual-chunk 1M context does not load, and HIP graphs
+regress throughput---so the AMD numbers reflect today's stack and should improve as
+it matures. \textbf{(2) Cross-vendor scope.} The NVIDIA B200 comparison is
+single-node (one node available) and uses the 235B only; its power telemetry was
+not collected, so B200 energy and tokens/joule are unavailable, and the comparison
+assumes each platform at its best-performing configuration (eager on AMD).
+\textbf{(3) Models and modality.} We evaluate two checkpoints; the medium tier is a
+multimodal MoE served text-only, so its vision encoder is loaded but unexercised
+(and is the cause of the FP8/TP$=$1 constraint). \textbf{(4) Quality guardrail.} The
+guardrail is a lightweight exact-match needle-recall check designed to catch
+speed-for-quality regressions, not a full task-quality evaluation; absolute
+correctness on real RAG tasks is out of scope. Finally, several capacity points sit
+at the first ladder rung, where goodput is small and prefill-dominated; we report
+run-to-run variance for these boundary points.

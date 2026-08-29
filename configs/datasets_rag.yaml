@@ -1,0 +1,48 @@
+# OpenDC-Infer-LC industry-RAG workloads (RAG-TopK, RAG-Report).
+# Long-context by design (32K), matching the LC-* regime. Built separately so the
+# four frozen LC-* splits are untouched; the two rag_*.jsonl files are dropped
+# into the same data dir used by the runners.
+seed: 20260602
+depths: [0.0, 0.25, 0.5, 0.75, 1.0]
+
+splits:
+  rag_topk:
+    target_tokens: 32768        # ~48-64 retrieved passages of ~512 tokens (long-context retrieval)
+    max_output_tokens: 256
+    n_samples: 600
+    k_passages: 64
+    distractors: 7              # 1 queried needle + 7 hard distractor needles
+    tasks:
+      rag_topk: 1.0
+
+  rag_report:
+    target_tokens: 32768        # long multi-document context
+    max_output_tokens: 2048     # long structured output (decode-bound)
+    n_samples: 200
+    n_facts: 5                  # output must reproduce all 5 magic numbers
+    tasks:
+      rag_report: 1.0
+
+  # Public realistic RAG (external validity): real Wikipedia multi-document QA
+  # from LongBench HotpotQA, packed with real distractor passages to 32K and
+  # graded by token-F1. Real text / real questions, the recognized analogue of
+  # the synthetic RAG-TopK shape.
+  rag_realqa:                   # Wikipedia multi-document QA (LongBench HotpotQA)
+    target_tokens: 32768
+    max_output_tokens: 64       # short factual answers
+    n_samples: 200              # = LongBench HotpotQA test split size
+    source_path: data/_public_src/hotpotqa.jsonl
+    tasks:
+      realqa: 1.0
+
+  rag_sciqa:                    # scientific-paper QA (LongBench QASPER)
+    target_tokens: 32768
+    max_output_tokens: 64
+    n_samples: 200
+    source_path: data/_public_src/qasper.jsonl
+    tasks:
+      realqa: 1.0
+
+multikey_distractors: 3
+warmup:
+  per_split: 64

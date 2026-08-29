@@ -6,8 +6,11 @@ results/
 .venv/
 .hf_cache/
 *.egg-info/
+build/
+dist/
 __pycache__/
 *.py[cod]
 *.log
 *.out
 *.err
+paper.bak.*/

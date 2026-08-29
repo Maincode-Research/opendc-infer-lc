@@ -1,0 +1,81 @@
+% OpenDC-Infer-LC — Experimental Setup (our instantiation of the benchmark).
+% The benchmark design, workloads, corpus, models, SLO profiles, metrics, and
+% measurement contract are in Section~\ref{sec:methodology}; this section states
+% only what is specific to our runs. Cross-references the result tables
+% (\ref{tab:main}, \ref{tab:scaling}, \ref{tab:single-node-235b},
+%  \ref{tab:full-matrix-35b}, \ref{tab:full-matrix-b200}).
+
+\section{Experimental Setup}
+\label{sec:experiments}
+
+We instantiate OpenDC-Infer-LC (Section~\ref{sec:methodology}) on two data-center
+accelerators and the two MoE tiers defined there---Qwen3-235B-A22B (headline) and
+Qwen3.5-35B-A3B (medium)---and sweep the axes that, a~priori, could each dominate
+serving capacity: \emph{vendor}, \emph{serving backend}, \emph{numerical
+precision}, \emph{cache state}, \emph{routing policy}, and \emph{node count}. The
+analysis in Section~\ref{sec:results} attributes the observed variation to these
+axes. All runs use the reference harness and the frozen, hash-pinned prompt sets;
+the harness, datasets, and one-file cluster runners are released for reproduction.
+We highlight only the choices and constraints specific to this deployment.
+
+\subsection{Platforms and backends}
+We evaluate two vendors with the single, vendor-neutral harness, varying only the
+serving/launch layer. \textbf{AMD MI355X} (CDNA4 / gfx950, $288$\,GB HBM3E/GPU),
+8 GPUs/node, up to 16 nodes on a SLURM cluster, served in rootless \texttt{podman}
+with the ROCm runtime---our primary platform for single-node \emph{and} multi-node
+scaling. \textbf{NVIDIA B200} (Blackwell, $\sim$192\,GB HBM3E/GPU), one node of
+8 GPUs, CUDA runtime via Docker, used for single-node cross-vendor comparison only
+(one node available). We treat the serving system as part of the system-under-test
+and compare \textbf{vLLM} and \textbf{SGLang} on both vendors, \textbf{TGI} on AMD,
+and \textbf{TensorRT-LLM} on NVIDIA; each exposes the OpenAI-compatible streaming
+endpoint the harness drives through the Section~\ref{sec:methodology} contract.
+TensorRT-LLM is CUDA-only (hence B200-only), and TGI's published ROCm images target
+MI210/250/300 and did not serve gfx950---the first of several stack-maturity
+coverage gaps we report rather than hide.
+
+\subsection{Precision, parallelism, and multi-node}
+\textbf{Precision.} BF16 is the reference; we additionally evaluate \emph{dynamic}
+FP8 and block-FP4 (MXFP4 via AMD Quark on MI355X), each validated against the BF16
+reference by the quality guardrail. \textbf{Parallelism.} A single-node replica
+fills the node at tensor parallelism $\text{TP}{=}8$. Two model-specific
+constraints surface as findings: (i)~dynamic FP8 of the 35B requires
+$\text{TP}{=}1$. The 35B is multimodal and ships a vision encoder whose ViT-MLP
+width is $4304$; although we serve text-only, those weights are still loaded and
+FP8-quantized, and $4304$ is not divisible by 16 after an 8-way shard
+($4304/8{=}538$), which the FP8 GEMM kernel rejects. (The language-model expert
+dimensions are 16-aligned; the text-only 235B has no such layer and runs FP8 at
+$\text{TP}{=}8$.) The 35B FP8/BF16 comparison is therefore run at $\text{TP}{=}1$;
+and
+(ii)~the 235B's 1M-context (dual-chunk attention) and the 35B's MXFP4 MoE
+checkpoint did not load on the ROCm/vLLM build, bounding the AMD context and
+precision sweeps. We also found that enabling HIP graphs (non-eager) \emph{regressed}
+throughput on gfx950 and failed to complete the long-context ladders, so all AMD
+numbers use eager mode---their best-performing configuration on this build.
+\textbf{Multi-node.} For scaling we replicate the model data-parallel (one
+$\text{TP}{=}8$ replica per node) behind a single production router
+(\texttt{sgl-router}, which fronts both vLLM and SGLang workers) so the load
+generator sees one endpoint. We sweep $N\in\{1,2,4,8\}$ nodes (up to 64 MI355X
+GPUs) on the 35B and, at fixed $N$, ablate two routing policies---\emph{cache-aware}
+(prefix-affinity) and \emph{round-robin} (load-spreading)---to separate routing
+from raw replication.
+
+\subsection{Measurement and reproducibility}
+Beyond the Section~\ref{sec:methodology} protocol, our runs add a warmup-priming
+request (before the timed window) that absorbs first-request kernel/graph
+compilation; per-device utilization, memory, power, and temperature sampled via
+\texttt{amd-smi}/\texttt{nvidia-smi} (the source for tokens/joule, collected on the
+AMD runs only, so B200 energy is unavailable); and scraping of each backend's
+\texttt{/metrics} endpoint for prefix-cache hit rate and KV usage. Sweeps are
+primarily closed-loop (the capacity ladder $1,2,4,8,\dots$), with open-loop Poisson
+arrivals as a saturation cross-check; because several capacity points sit near an
+SLO boundary, we report run-to-run variance for boundary points. The single-node
+matrix crosses $\{$vLLM, SGLang, TGI/TRT-LLM$\}\times\{$BF16, FP8, MXFP4$\}\times$
+the four LC-$*$ length/cache workloads per model per vendor; the AMD platform adds
+the multi-node $N\in\{1,2,4,8\}$ sweep with the routing ablation. The two
+retrieval-shape workloads (RAG-TopK, RAG-Report) are defined and released with the
+harness and frozen datasets; their pilot evaluation is reported in
+Section~\ref{sec:results} where available and otherwise left to the expanded
+leaderboard. Configurations the current
+toolchain cannot serve (MXFP4 MoE on the 35B, dual-chunk 1M context, TGI on gfx950)
+are reported as explicit coverage gaps. All code, the frozen hash-pinned prompt
+sets, and the exact SLURM run scripts are released to reproduce every cell.

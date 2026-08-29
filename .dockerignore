@@ -1,0 +1,12 @@
+data/
+results/
+paper/
+paper.bak*/
+.venv/
+.hf_cache/
+.git/
+**/__pycache__/
+*.egg-info/
+*.log
+*.out
+*.err

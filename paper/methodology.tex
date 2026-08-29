@@ -1,0 +1,218 @@
+\section{Methodology}
+\label{sec:methodology}
+
+We propose \textbf{OpenDC-Infer-LC}, an open, hardware-neutral benchmark for
+long-context and retrieval-augmented generation (RAG) inference serving in
+data-center environments. It complements model-centric long-context evaluations
+and generic throughput benchmarks: rather than reporting peak tokens per second,
+OpenDC-Infer-LC measures whether a serving \emph{system} can sustain long-context
+workloads under realistic service-level objectives (SLOs), and additionally
+reports cache behavior, multi-node capacity, reliability, and energy efficiency.
+The main body covers the objective and system under test
+(Section~\ref{subsec:objective}), the benchmark definition---workloads, models,
+and SLOs (Section~\ref{subsec:definition})---and the scoring metrics
+(Section~\ref{subsec:metrics}); the full submission protocol (endpoint contract,
+cache-state taxonomy, harness procedure, leaderboard rules, and corpus mechanics)
+is deferred to Appendix~\ref{sec:protocol_appendix}.
+
+\subsection{Objective and System Boundary}
+\label{subsec:objective}
+The central question is:
+\vspace{-0.25\baselineskip}
+\begin{quote}\itshape
+``Given a fixed model, tokenizer, workload, and latency requirement, how many
+long-context or RAG requests can a cluster serving system process reliably?''
+\end{quote}
+\vspace{-0.25\baselineskip}
+
+This differs from endpoint-only benchmarking. OpenDC-Infer-LC evaluates the full
+serving system---scheduler, container runtime, accelerator allocation,
+interconnect, storage and cache paths, telemetry, serving backend, and request
+load generator---to measure production-relevant capacity rather than whether an
+endpoint is merely reachable. We target long-context and RAG-style inference
+because these workloads dominate a growing share of production traffic (enterprise
+document QA, codebase reasoning, agent memory, multi-turn retrieval-augmented
+assistants) and, relative to short chat, place far greater pressure on prefill
+efficiency, KV-cache memory, request scheduling, prefix reuse, and multi-node
+scaling. The benchmark is hardware- and backend-neutral: any accelerator (AMD,
+NVIDIA, TPU, custom) and any serving backend (vLLM, SGLang, TensorRT-LLM, TGI, or a
+proprietary runtime) may participate, provided it follows the measurement and
+submission rules.
+
+\subsection{Benchmark Definition}
+\label{subsec:definition}
+A benchmark track fixes three things: \emph{what} is served (the workloads and
+corpus), with \emph{which} model and tokenizer, and to \emph{what} latency target
+(the SLO profile). All three are frozen so that submissions differ only in the
+system under test.
+
+\subsubsection{Workloads and Corpus}
+\label{subsec:workloads}
+OpenDC-Infer-LC defines six workloads (Table~\ref{tab:workloads}) chosen to span
+the shapes that dominate production long-context and RAG traffic. Four
+\emph{length/cache} workloads isolate context scaling and prefix reuse: for LC-8K,
+LC-32K, and LC-128K a request is a single long context, a user query, and a fixed
+maximum generation length; LC-Cache instead shares one long prefix across many
+requests with differing queries, exercising prefix reuse and KV-cache management.
+Two \emph{retrieval-shape} workloads capture how enterprise RAG actually arrives.
+\textbf{RAG-TopK} models vector-database retrieval: each request concatenates $k{=}64$
+independently retrieved passages ($\sim$512 tokens each) from \emph{different}
+documents, exactly one of which carries the answer while the rest are hard
+distractors, and the retrieved set varies per query---so unlike the single-haystack
+workloads it stresses \emph{fragmented} prefill and \emph{low cross-query cache
+reuse}. \textbf{RAG-Report} models report/summary generation: a multi-document
+context with a \emph{long structured output} (2048 tokens) that must reproduce a set
+of required facts, exercising the \emph{decode-bound} regime and long-generation
+tail latency that the short-output workloads never reach.
+Because these synthetic workloads trade external validity for control, we add two
+\emph{public real-text} retrieval workloads for external validity:
+\textbf{RAG-RealQA} (real Wikipedia multi-document QA from LongBench HotpotQA) and
+\textbf{RAG-SciQA} (scientific-paper QA from LongBench QASPER). Each real example is
+packed to the same $32$K budget with additional real passages drawn from the corpus
+and graded by token-F1 (the standard multi-document-QA metric); they are the
+recognized-benchmark analogue of RAG-TopK and confirm the synthetic findings carry to
+real text and a non-Wikipedia domain (\S\ref{subsec:rag_details}).
+
+\begin{table*}[t]
+\centering
+\small
+\caption{OpenDC-Infer-LC workload definitions.}
+\label{tab:workloads}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Workload} & \textbf{Input Tokens} & \textbf{Max Output Tokens} & \textbf{Target Scenario} \\
+\midrule
+LC-8K & 8K & 512 & Standard RAG \\
+LC-32K & 32K & 512 & Enterprise document QA \\
+LC-128K & 128K & 1024 & Long-document and codebase QA \\
+LC-Cache & 32K shared prefix $+$ multi-turn queries & 256 per turn & Agentic and repeated-prefix RAG \\
+\midrule
+RAG-TopK & $k{=}64$ retrieved passages ($\sim$512 tok each, $\approx$32K) & 256 & Vector-DB top-$k$ retrieval \\
+RAG-Report & 32K multi-document & 2048 & Report / summary generation \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The corpus is \textbf{fully synthetic and procedurally generated from a seeded
+random number generator}---never sourced from public documents---using a
+RULER-style needle-in-a-haystack template with ``magic number'' needles as
+exact-match answer keys (for RAG-TopK the needle sits in one retrieved passage and
+the others are distractors; for RAG-Report the long output must reproduce a set of
+required needles). Synthetic generation gives metric integrity (a repeated real
+passage would inflate prefix-cache hit rates and distort the cache metrics), license
+cleanliness, and bit-for-bit reproducibility; each prompt is fitted to its target
+token length \emph{exactly} ($\leq8$-token drift) per tokenizer and pinned by a
+\texttt{dataset\_version\_hash}. Full generation details are in
+Appendix~\ref{subsec:corpus_details}.
+
+\subsubsection{Models and Tokenizers}
+\label{subsec:model_selection}
+Each track fixes the model checkpoint, tokenizer, maximum output length, and
+sampling parameters. Submissions may vary hardware, serving framework, parallelism,
+quantization, and cache optimizations, but must use the same benchmark-visible
+model and tokenizer. We define two open-weight mixture-of-experts (MoE) tiers:
+\begin{itemize}
+    \item \textbf{Medium tier: Qwen3.5-35B-A3B} (35\,B total / 3\,B active),
+    intended for single-node and small-cluster submissions.
+    \item \textbf{Large tier: Qwen3-235B-A22B-Instruct-2507} (235\,B total /
+    22\,B active, 256K native context), the main data-center leaderboard model.
+\end{itemize}
+Sampling is deterministic ($\texttt{temperature}{=}0$, $\texttt{top\_p}{=}1$). The
+runner re-tokenizes prompts and outputs with the declared tokenizer unless a
+submission provides a validated server-side token-accounting contract.
+
+\subsubsection{Service-Level Objectives}
+\label{subsec:slo}
+The benchmark defines three SLO profiles (Table~\ref{tab:slo}). The
+\emph{interactive} profile applies to LC-8K, LC-32K, and RAG-TopK; the \emph{heavy}
+profile applies to LC-128K; and a \emph{generation} profile---which relaxes the
+end-to-end bound to admit long outputs while keeping the per-token (TPOT)
+bound---applies to the long-output RAG-Report. LC-Cache is reported under the
+profile matching its configured context length and cache state. We gate on p95
+rather than mean because production inference is tail-bound.
+
+\begin{table*}[t]
+\centering
+\caption{Service-level objectives used in OpenDC-Infer-LC v1.0.}
+\label{tab:slo}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{SLO Profile} & \textbf{TTFT p95} & \textbf{TPOT p95} & \textbf{E2E p95} & \textbf{Success Rate} \\
+\midrule
+Interactive RAG & $<3$\,s & $<120$\,ms/token & $<60$\,s & $>99\%$ \\
+Heavy Long-Context & $<10$\,s & $<200$\,ms/token & $<180$\,s & $>98\%$ \\
+Generation (long-output) & $<10$\,s & $<200$\,ms/token & $<300$\,s & $>98\%$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Metrics}
+\label{subsec:metrics}
+A run is scored on one primary metric (SLO-qualified goodput), a broad set of
+secondary diagnostics (Table~\ref{tab:metrics}; full list in
+Appendix~\ref{subsec:secondary_full}), and a correctness guardrail.
+
+\subsubsection{Primary Metric: SLO-Qualified Goodput}
+\label{subsec:goodput}
+The primary metric is \textbf{SLO-qualified output-token goodput}. A run is
+\emph{SLO-qualified} if its aggregate p95 TTFT, p95 TPOT, p95 E2E, and success rate
+all satisfy the selected profile over the full measurement window. Let
+$\mathcal{R}$ be the requests in a run and $y_i$ the output tokens of request $i$.
+Define $v_i{=}1$ if request $i$ is successful (not timed out, cancelled, or
+malformed), produces a valid final output, \emph{and} passes the quality guardrail
+(Section~\ref{subsec:quality}); otherwise $v_i{=}0$. For duration $T$,
+\begin{equation}
+\mathrm{Goodput}_{\mathrm{SLO}}
+= \frac{\sum_{i \in \mathcal{R}} v_i\, y_i}{T}.
+\label{eq:goodput}
+\end{equation}
+The quality guardrail is a \emph{separate} gate from the latency/success
+qualification: it does not enter SLO-qualification but enters the metric through
+$v_i$, zeroing the token contribution of quality-failing requests. A configuration
+can therefore be SLO-qualified on latency yet see its goodput collapse because it
+answers incorrectly, so latency-qualification and answer correctness must be read
+together. A non-qualified run is ineligible for ranking regardless of raw
+throughput. For capacity search the harness raises the offered load until the SLO
+is violated, reporting the highest qualified point and retaining the first
+violating point as the saturation boundary. For multi-node submissions we report
+scaling efficiency
+\begin{equation}
+\mathrm{Efficiency}(N) = \frac{G(N)}{N \cdot G(1)},
+\label{eq:efficiency}
+\end{equation}
+where $N$ is the node count and $G$ is, by default, $\mathrm{Goodput}_{\mathrm{SLO}}$;
+when a configuration fails the quality guardrail \emph{uniformly} across the sweep
+(so goodput is a near-constant quality factor below the raw rate and would mask the
+system-level scaling), we set $G$ to the raw SLO-qualified output throughput and
+mark the result.
+
+\subsubsection{Quality Guardrail}
+\label{subsec:quality}
+A lightweight quality guardrail prevents trading correctness for speed. Each prompt
+carries a ground-truth answer (the needle value); the per-request quality check is
+an \textbf{exact match} between the model's parsed answer and that value (for
+multi-key prompts, the value of the \emph{queried} key), and LC-Cache additionally
+checks answer consistency across multi-turn queries sharing the same prefix. The
+per-run \emph{quality score} is the fraction of successful requests that pass, and a
+submission is valid only if it stays within tolerance of a BF16 reference run:
+\begin{equation}
+\mathrm{QualityRatio}
+= \frac{\mathrm{QualityScore}_{\mathrm{submission}}}{\mathrm{QualityScore}_{\mathrm{reference}}}
+\;\geq\; 0.98 \;\;(\text{default}),
+\label{eq:qualityratio}
+\end{equation}
+so a quantized or optimized system cannot climb the leaderboard by emitting faster
+but incorrect answers.
+
+\subsection{Load Generation}
+\label{subsec:load_generation}
+OpenDC-Infer-LC uses two load-generation modes. The \textbf{closed-loop} mode holds
+a fixed number of concurrent users and sweeps exponentially increasing concurrency
+($1,2,4,8,16,32,64,\ldots$) until the SLO is violated, yielding the capacity curve.
+The \textbf{open-loop} mode issues a Poisson arrival process at a fixed offered
+rate, swept upward to saturation, better reflecting production traffic where
+requests arrive independently. For each workload we report the highest
+SLO-qualified offered load and retain the first non-qualified point as the
+(unranked) saturation boundary. The endpoint measurement contract, cache-state
+rules, reference-harness procedure, and leaderboard/submission rules are specified
+in Appendix~\ref{sec:protocol_appendix}.

@@ -1,0 +1,121 @@
+% OpenDC-Infer-LC — benchmark protocol / submission details (APPENDIX).
+% Place after \appendix. Holds the spec machinery moved out of the main-body
+% Methodology (Section~\ref{sec:methodology}) to fit the page budget: full corpus
+% mechanics, the endpoint measurement contract, the cache-state taxonomy, the
+% reference-harness procedure, and leaderboard/submission rules. Requires:
+% \usepackage{enumitem}. Labels are unchanged so main-body cross-references resolve.
+
+\section{Benchmark Protocol and Submission Details}
+\label{sec:protocol_appendix}
+This appendix gives the full specification deferred from the main-body methodology:
+the synthetic-corpus generator, the endpoint measurement contract, the LC-Cache
+state taxonomy, the reference-harness run procedure, and the leaderboard/submission
+rules.
+
+\subsection{Corpus Generation}
+\label{subsec:corpus_details}
+The long-context haystack is \textbf{procedurally generated from a seeded random
+number generator}, never sourced from public documents. Each prompt follows a
+RULER-style needle-in-a-haystack template: an instruction header, a synthetic
+haystack built from a seeded sentence generator over fixed adjective/noun/verb/
+connective vocabularies, one or more embedded \emph{needles}, and a question
+footer. A needle is a distinctive ``magic number'' statement (\emph{``One of the
+special magic numbers for \texttt{<key>} is: \texttt{<value>}.''}) with
+\texttt{key} drawn from a fixed keyword set and \texttt{value} a random 7-digit
+integer, giving an unambiguous exact-match target for the quality guardrail. We use
+\textbf{single-key} (one needle) and \textbf{multi-key} (one queried needle plus
+decoy needles with different keys at evenly spread depths) variants. A
+length-control step re-tokenizes the decoded prompt with the declared tokenizer and
+truncates/pads the filler so the total hits the target token count \emph{exactly}
+($\leq8$-token drift, recorded per sample). Because token boundaries are
+tokenizer-specific, the frozen sets are generated \emph{per tokenizer} (one tree
+per model) and pinned by a \texttt{dataset\_version\_hash}. Synthetic generation is
+chosen for three reasons: metric integrity (a repeated real passage is highly
+compressible and would inflate prefix-cache hit rates, distorting the cache metrics
+the benchmark measures), license cleanliness, and bit-for-bit reproducibility.
+
+\subsection{Secondary Metrics (Full Set)}
+\label{subsec:secondary_full}
+Beyond SLO-qualified goodput (Eq.~\ref{eq:goodput}) and scaling efficiency
+(Eq.~\ref{eq:efficiency}), the harness reports the following; Table~\ref{tab:metrics}
+lists each with its availability marker.
+\begin{itemize}[leftmargin=*, nosep, topsep=0pt, partopsep=0pt]
+    \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}\setlength{\parsep}{0pt}\setlength{\topsep}{0pt}
+    \item \textbf{Latency:} TTFT, TPOT, and E2E at p50/p95/p99.
+    \item \textbf{Throughput:} raw output tok/s, total tok/s, and requests/s.
+    \item \textbf{Capacity:} max concurrent users and max request rate under the SLO.
+    \item \textbf{Reliability:} success, timeout, server-error, cancellation, and OOM rates.
+    \item \textbf{Cache behavior:} prefix-cache hit rate, KV-cache usage, placement, eviction policy, and cache-reuse speedup.
+    \item \textbf{Transport:} declared/observed transport, fallback count, and cross-node communication evidence.
+    \item \textbf{Storage:} model/prompt/cache/log paths, read/write bandwidth, and whether each path is in the timed request path.
+    \item \textbf{Hardware efficiency:} output tok/s per accelerator and, when available, output tokens per joule.
+    \item \textbf{Run stability:} run-to-run variance, p99 drift, thermal-throttling indicators, telemetry gaps, and post-saturation behavior.
+\end{itemize}
+
+\subsection{Endpoint Measurement Contract}
+\label{subsec:endpoint_contract}
+The reference harness drives an OpenAI-compatible streaming endpoint (or
+equivalent). Because endpoints differ in streaming behavior, we fix:
+\begin{itemize}
+    \item \textbf{Request start:} immediately before the client sends the request.
+    \item \textbf{TTFT:} start until the first \emph{non-empty} generated token; metadata-only or empty chunks do not count.
+    \item \textbf{TPOT:} $\mathrm{TPOT}_i = (t^{\mathrm{end}}_i - t^{\mathrm{first}}_i)/\max(y_i-1,1)$, with $y_i$ output tokens and $t^{\mathrm{first}}_i,t^{\mathrm{end}}_i$ the first-token and completion timestamps.
+    \item \textbf{E2E:} start until the final completion event is parsed and the stream closes cleanly.
+    \item \textbf{Token accounting:} prompts/outputs re-tokenized with the declared tokenizer unless a validated server-side contract is provided.
+    \item \textbf{Timeouts/cancellations:} timed-out, cancelled, malformed, or incomplete requests are unsuccessful and count against the success rate.
+    \item \textbf{Retries:} disabled by default; if enabled for a diagnostic run, reported separately.
+\end{itemize}
+The submission package includes a \texttt{loadgen\_config.yaml} specifying
+load-generator hosts, CPU count, NICs, network path, client processes, connection
+settings, TLS mode, tokenizer mode, timeouts, retry policy, and clock source. The
+load generator must not be the bottleneck at the reported peak: submissions report
+host count, CPU/NIC utilization, client process count, connection/timeout settings,
+tokenizer mode, and clock source, and a run in which the generator saturates CPU,
+network, file I/O, TLS, connection pools, or tokenization is invalid for ranking.
+
+\subsection{LC-Cache State Rules}
+\label{subsec:cache_rules}
+Because cache state strongly affects results, cache modes are reported separately:
+\begin{itemize}
+    \item \textbf{Cold cache:} no prefix/KV/semantic/document/storage cache populated before the timed window.
+    \item \textbf{Benchmark-warmed cache:} reuse arises only from requests issued during the timed window.
+    \item \textbf{Prefilled cache:} the shared prefix / reusable state is loaded before the timed window.
+    \item \textbf{Persistent session cache:} state persists across turns within one synthetic conversation.
+    \item \textbf{Cross-run cache:} state survives across independent runs---\emph{prohibited} for ranked submissions unless disclosed in a separate non-default category.
+\end{itemize}
+Each LC-Cache submission discloses whether prefix caching, paged KV cache, KV
+offload, semantic cache, document cache, or storage-backed cache is enabled, and
+reports cache key granularity, capacity, eviction policy, observed hit rate, reset
+procedure, and memory location (HBM, host DRAM, local NVMe, shared filesystem, or
+remote object storage). LC-Cache leaderboards are reported separately for
+cold-, benchmark-warmed-, and prefilled-cache modes.
+
+\subsection{Reference Harness Procedure}
+\label{subsec:harness}
+The reference harness handles workload generation, request scheduling,
+streaming-response measurement, token accounting, SLO validation, quality
+checking, metadata collection, and report generation. It is backend-neutral and
+talks to any endpoint satisfying the measurement contract. A run proceeds:
+\begin{enumerate}
+    \item Select workload, model tier, SLO profile, cache mode, and load-generation mode.
+    \item Verify the system passed the data-center qualification phase (Section~\ref{sec:execution_protocol}).
+    \item Warm up the serving system under a fixed warmup policy (including a priming request that absorbs first-request kernel/graph compilation).
+    \item Run the timed measurement window at a fixed offered load.
+    \item Record per-request metrics, streaming timestamps, system metrics, transport logs, and load-generator metrics.
+    \item Compute latency, reliability, raw throughput, SLO-qualification status, and SLO-qualified goodput.
+    \item Run the quality guardrail on the validation subset.
+    \item Emit the standardized submission package and report.
+\end{enumerate}
+
+\subsection{Leaderboard and Submission}
+\label{subsec:leaderboard}
+OpenDC-Infer-LC reports multiple leaderboards rather than one aggregate score. The
+main leaderboard ranks by SLO-qualified goodput on LC-32K (the primary enterprise
+RAG setting); additional leaderboards cover LC-8K interactive capacity, LC-128K
+heavy long-context capacity, LC-Cache prefix-reuse efficiency, and hardware
+efficiency. A submission is ranked only if: the run is SLO-qualified; the quality
+guardrail is satisfied; the system qualification phase passes; required metadata
+and raw artifacts are provided; and the cache-state, endpoint-measurement, and
+timed-window rules are followed. Submissions lacking complete qualification
+evidence may be listed as preliminary or partially qualified but are not ranked
+against fully qualified ones.

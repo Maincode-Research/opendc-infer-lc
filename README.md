@@ -7,10 +7,105 @@ realistic SLOs, and reports **SLO-qualified goodput** plus a broad set of
 secondary metrics (latency tails, capacity, reliability, cache behavior,
 hardware efficiency, scaling, and a quality guardrail).
 
-This repo contains the **dataset builder**, the **reference harness**, and the
-**cluster run scripts**. It is currently exercised on AMD MI355X (vLLM/ROCm); it
-is backend- and vendor-neutral (vLLM / SGLang / TGI / TensorRT-LLM, AMD or
-NVIDIA) — any OpenAI-compatible streaming endpoint works.
+The harness drives **any OpenAI-compatible streaming endpoint** — vLLM, SGLang,
+TGI, TensorRT-LLM, or a hosted API, on AMD or NVIDIA. It never launches your
+server, so nothing about your stack has to match ours.
+
+---
+
+## Test your system in three commands
+
+```bash
+git clone https://github.com/MaincodeHQ/opendc-infer-lc && cd opendc-infer-lc
+pip install ".[hf]"          # harness + real tokenizers
+                             # (once published: pip install "opendc-infer-lc[hf]")
+
+# 0. no server needed — verify the install end to end (mock endpoint, ~30s)
+opendc-bench selftest
+
+# 1. build the prompt set for YOUR model's tokenizer (once; deterministic)
+opendc-data build --config datasets.yaml \
+    --tokenizer hf:meta-llama/Llama-3.1-8B-Instruct --out data/prompts_llama31
+
+# 2. point it at your already-running endpoint
+opendc-bench suite --base-url http://127.0.0.1:8000 --data data/prompts_llama31 \
+    --accelerators 8 --label my-stack
+```
+
+That's it. `suite` waits for the endpoint to come up, discovers the served model
+name from `/v1/models` and the tokenizer from the dataset manifest, runs a
+capacity search for every workload in the dataset, scrapes `/metrics` if the
+backend exposes it, and writes a comparable result directory:
+
+```
+results/my-stack_<timestamp>/
+├── run_meta.json     endpoint, hardware, dataset_version_hash  ← pin this
+├── lc_8k.json …      full capacity ladder per workload
+├── summary.csv       machine-readable
+└── summary.md        the table below
+```
+
+```
+| workload | goodput tok/s | C* | sat | ttft p95 | tpot p95 | e2e p95 | succ  | quality |
+|----------|---------------|----|-----|----------|----------|---------|-------|---------|
+| lc_8k    | 7592.0        | 32 | 64  | 0.611    | 0.0212   | 8.03    | 1.000 | 1.000   |
+```
+
+**Useful flags:** `--workloads lc_32k lc_128k` (subset) · `--mode open
+--open-max-rps 32` (Poisson arrivals instead of a concurrency ladder) ·
+`--max-concurrency 256` · `--measure 300` · `--backend vllm --quant fp8`
+(recorded in `run_meta.json`) · `--server-metrics-url ''` (disable scraping).
+
+### Container (no Python setup)
+
+```bash
+docker build -t opendc-infer-lc .
+docker run --rm --network host -v "$PWD/data:/data" -v "$PWD/results:/results" \
+    opendc-infer-lc suite --base-url http://127.0.0.1:8000 \
+    --data /data/prompts_llama31 --out /results/my-stack
+```
+
+The image is CPU-only (~370 MB, or ~180 MB without the `[hf]` extra) and serves nothing — run it next to your server,
+or on another host with `--base-url http://<server>:8000`.
+
+### Editable install (development)
+
+```bash
+pip install -e ".[hf]"
+opendc-bench selftest
+```
+
+### Prompt sets
+
+Datasets are **per-tokenizer** (lengths are exact token counts for *your*
+tokenizer) and frozen with a `dataset_version_hash` in `MANIFEST.json`. Two
+options, both fine — pin the hash either way:
+
+- **Build them** (above). Deterministic: same config + same tokenizer → the
+  same bytes on any machine, with builder ≥ 0.2.0.
+- **Download** pre-built sets for the tokenizers we publish, from the
+  companion Hugging Face dataset (see `data/README.md`).
+
+The real-text workloads (`datasets_rag.yaml`, `datasets_realqa.yaml`,
+`datasets_1m.yaml`) pack genuine documents from LongBench; fetch those sources
+once with:
+
+```bash
+opendc-data fetch-corpus --out data/_public_src     # stdlib only, no extra deps
+```
+
+It pulls LongBench's `data.zip` and writes the six subsets in the exact form the
+builder expects — including the prompt-template split and 50-document limit the
+published 1M sets were built from, so the corpora come out record-for-record
+identical to ours (`--limit 0` keeps all 200 whole-document records instead).
+
+### Reporting a result
+
+A submission is the result directory as-is. It already carries everything a
+reader needs to trust and reproduce the number: `dataset_version_hash`, the
+served model, harness version, load mode, warmup/measure windows, accelerator
+count, and the full ladder — not just the winning point. Runs near an SLO
+boundary vary; repeat and use `analyze variance` before claiming a win.
 
 ---
 
@@ -18,16 +113,20 @@ NVIDIA) — any OpenAI-compatible streaming endpoint works.
 
 ```
 opendc-infer-lc/
-├── README.md                 ← this file
-├── requirements.txt          ← deps for the dataset build (transformers/tokenizers/pyyaml)
+├── pyproject.toml            ← installable package (`opendc-bench`, `opendc-data`)
+├── Dockerfile                ← CPU-only harness image
 ├── configs/
 │   ├── datasets.yaml         ← standard workloads (8K/32K/128K/cache)
 │   ├── datasets_long.yaml    ← extreme-length probe (256K/512K/960K)
+│   ├── datasets_rag.yaml     ← industry RAG shapes (real documents)
+│   ├── datasets_realqa.yaml  ← public real multi-doc QA (LongBench)
+│   ├── datasets_1m.yaml      ← 1M-token applications (repo code, multi-doc)
 │   └── datasets.smoke.yaml   ← tiny offline smoke config
 ├── src/
 │   ├── opendc_data/          ← dataset builder (RULER-style NIAH + LC-Cache)
-│   │   ├── build.py  tokenizer.py  haystack.py  tasks.py
+│   │   ├── build.py  tokenizer.py  haystack.py  tasks.py  fetch.py  cli.py
 │   └── opendc_bench/         ← reference harness (pure stdlib, no torch needed)
+│       ├── suite.py          ← ★ one-command runner for any endpoint
 │       ├── client.py         ← async streaming client (TTFT/TPOT/E2E contract)
 │       ├── metrics.py        ← SLO profiles + goodput + percentiles + sub-rates
 │       ├── runner.py         ← closed/open-loop load gen + capacity search
@@ -36,23 +135,24 @@ opendc-infer-lc/
 │       ├── router.py         ← round-robin proxy for multi-node (one endpoint)
 │       ├── analyze.py        ← leaderboard / scaling / energy / speedup / drift
 │       ├── mockserver.py     ← offline mock endpoint for testing
-│       └── cli.py            ← `point` and `capacity` commands
-├── deploy/
-│   ├── mc2/                  ← AMD MI355X (ROCm)
-│   │   ├── run_eval_amd.sh   ← ★ ONE-FILE end-to-end eval (build → serve → bench)
-│   │   └── run_all.sh        ← submit the whole AMD matrix (one job per backend)
+│       └── cli.py            ← `suite`, `point`, `capacity`, `selftest`
+├── deploy/                   ← OUR cluster recipes (optional; see below)
+│   ├── mc2/                  ← AMD MI355X (ROCm, SLURM + podman)
 │   ├── b200/                 ← NVIDIA B200 (CUDA)
-│   │   ├── run_eval_b200.sh  ← ★ ONE-FILE eval (vllm/sglang/trtllm; DCA/1M)
-│   │   └── README.md         ← B200 quickstart + cross-vendor notes
-│   ├── gpu_telemetry.py/.sh  ← AMD/NVIDIA power/util/temp sampler
-│   └── README.md             ← deployment guide
+│   └── gpu_telemetry.py/.sh  ← AMD/NVIDIA power/util/temp sampler
 ├── paper/metrics.tex         ← metrics section + table for the paper
 └── data/                     ← frozen per-tokenizer prompt sets (generated)
 ```
 
 ---
 
-## Quickstart — run the whole eval on AMD (one command)
+## Reference deployment: serve + benchmark in one SLURM job (our cluster)
+
+Everything below is **optional** — it is how *we* run the benchmark on the mc2
+AMD cluster, kept as a worked example. You do not need SLURM, podman or ROCm to
+use the benchmark; `opendc-bench suite` is the supported entry point.
+
+### One command on AMD MI355X
 
 `deploy/mc2/run_eval_amd.sh` is a single SLURM job that does everything:
 
@@ -153,6 +253,9 @@ and definitions.
 
 ## Post-processing
 
+All post-processing is `python -m opendc_bench.analyze <cmd>` (or
+`opendc-analyze <cmd>` after install):
+
 ```bash
 python -m opendc_bench.analyze leaderboard results --workload lc_32k
 python -m opendc_bench.analyze scaling results/*_N1_* results/*_N2_* --workload lc_32k
@@ -166,18 +269,27 @@ python -m opendc_bench.analyze drift    results/<run>/raw.jsonl    # p99 tail dr
 
 ## Offline development (no cluster, no GPU)
 
-The harness is dependency-free stdlib and ships a mock endpoint:
+The harness is dependency-free stdlib and ships a mock endpoint, so the whole
+pipeline — build → serve → measure → score → report — runs on a laptop:
 
 ```bash
-python -m opendc_data.build --config configs/datasets.smoke.yaml --tokenizer char --out data/_smoke
-python -m opendc_bench.mockserver --port 8000 &        # fake streaming server
-PYTHONPATH=src python -m opendc_bench.cli capacity \
-    --base-url http://127.0.0.1:8000 --model test --tokenizer char \
-    --data data/_smoke --workload lc_8k --warmup 1 --measure 3 --max-concurrency 8
+opendc-bench selftest              # does all of the below in a temp dir, asserts PASS
 ```
 
-For real datasets you need `pip install -r requirements.txt` and the model
-tokenizer (HF id or local path; pass as `--tokenizer hf:<path-or-id>`).
+Or drive the pieces by hand:
+
+```bash
+opendc-data build --config datasets.smoke.yaml --tokenizer char --out data/_smoke
+python -m opendc_bench.mockserver --port 8000 &        # fake streaming server
+opendc-bench suite --base-url http://127.0.0.1:8000 --data data/_smoke \
+    --tokenizer char --warmup 1 --measure 3 --max-concurrency 8
+```
+
+`selftest` is also the CI check — if it passes on your machine, the harness,
+metrics, quality guardrail and reporting all work; only the endpoint is left.
+
+For real datasets you need the `[hf]` extra and the model tokenizer (HF id or
+local path; pass as `--tokenizer hf:<path-or-id>`).
 
 ---
 

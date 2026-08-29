@@ -1,0 +1,109 @@
+% Auto-generated per-load-point matrix for multi-node RAG scaling (tab:scaling-rag).
+% Requires booktabs, longtable. 235B goodput=raw (q=1.0); 35B see qual column.
+\begin{longtable}{@{}l l r r r r r r r@{}}
+\caption{\textbf{Multi-node RAG scaling, per-load-point detail} (AMD MI355X, DP TP$=$8 replicas, sgl-router). goodput is SLO-qualified output tok/s; raw is unfiltered; qual is the F1/needle quality score; $\checkmark/\times$ marks whether the point meets all SLOs. $N$ is replica count; pol is routing policy.}\label{tab:full-scaling-rag}\\
+\toprule
+$N$\,pol & wl & C & goodput & raw & TTFT$_{95}$ & TPOT$_{95}$ & E2E$_{95}$ & qual \\ \midrule
+\endfirsthead
+\toprule $N$\,pol & wl & C & goodput & raw & TTFT$_{95}$ & TPOT$_{95}$ & E2E$_{95}$ & qual \\ \midrule \endhead
+1\,cache/rr & TopK & 1 & 3.5 & 3.5 & 1.7 & 35 & 1.9 & 1.00~$\checkmark$ \\
+1\,cache/rr & TopK & 2 & 4.3 & 4.3 & 4.5 & 438 & 5.0 & 1.00~$\times$ \\
+1\,cache/rr & Report & 1 & 16.1 & 16.1 & 1.7 & 39 & 4.0 & 1.00~$\checkmark$ \\
+1\,cache/rr & Report & 2 & 25.1 & 25.1 & 4.7 & 76 & 7.0 & 1.00~$\checkmark$ \\
+1\,cache/rr & Report & 4 & 31.1 & 31.1 & 7.4 & 222 & 18.1 & 1.00~$\times$ \\
+\midrule
+2\,cache & TopK & 1 & 3.6 & 3.6 & 1.7 & 34 & 1.9 & 1.00~$\checkmark$ \\
+2\,cache & TopK & 2 & 8.1 & 8.1 & 1.7 & 73 & 1.9 & 1.00~$\checkmark$ \\
+2\,cache & TopK & 4 & 10.9 & 10.9 & 4.5 & 436 & 5.0 & 1.00~$\times$ \\
+2\,cache & Report & 1 & 16.1 & 16.1 & 1.7 & 36 & 3.9 & 1.00~$\checkmark$ \\
+2\,cache & Report & 2 & 36.1 & 36.1 & 1.7 & 39 & 4.0 & 1.00~$\checkmark$ \\
+2\,cache & Report & 4 & 53.2 & 53.2 & 2.7 & 76 & 7.2 & 1.00~$\checkmark$ \\
+2\,cache & Report & 8 & 64.3 & 64.3 & 7.4 & 240 & 18.1 & 1.00~$\times$ \\
+\midrule
+2\,rr & TopK & 1 & 3.5 & 3.5 & 1.8 & 36 & 2.0 & 1.00~$\checkmark$ \\
+2\,rr & TopK & 2 & 7.9 & 7.9 & 1.8 & 39 & 2.0 & 1.00~$\checkmark$ \\
+2\,rr & TopK & 4 & 12.2 & 12.2 & 3.2 & 577 & 6.6 & 1.00~$\times$ \\
+2\,rr & Report & 1 & 15.6 & 15.6 & 1.8 & 38 & 4.0 & 1.00~$\checkmark$ \\
+2\,rr & Report & 2 & 32.1 & 32.1 & 1.8 & 36 & 3.9 & 1.00~$\checkmark$ \\
+2\,rr & Report & 4 & 49.2 & 49.2 & 2.6 & 78 & 7.2 & 1.00~$\checkmark$ \\
+2\,rr & Report & 8 & 63.8 & 63.8 & 4.4 & 245 & 18.9 & 1.00~$\times$ \\
+\midrule
+4\,cache & TopK & 1 & 3.5 & 3.5 & 1.8 & 37 & 2.0 & 1.00~$\checkmark$ \\
+4\,cache & TopK & 2 & 8.1 & 8.1 & 1.8 & 74 & 2.0 & 1.00~$\checkmark$ \\
+4\,cache & TopK & 4 & 17.4 & 17.4 & 1.8 & 78 & 2.0 & 1.00~$\checkmark$ \\
+4\,cache & TopK & 8 & 2.2 & 2.2 & 21.4 & 775 & 26.0 & 1.00~$\times$ \\
+4\,cache & Report & 1 & 16.1 & 16.1 & 1.8 & 41 & 4.1 & 1.00~$\checkmark$ \\
+4\,cache & Report & 2 & 35.1 & 35.1 & 1.8 & 41 & 4.0 & 1.00~$\checkmark$ \\
+4\,cache & Report & 4 & 72.3 & 72.3 & 1.8 & 40 & 3.9 & 1.00~$\checkmark$ \\
+4\,cache & Report & 8 & 133.2 & 133.2 & 2.7 & 74 & 7.1 & 1.00~$\checkmark$ \\
+4\,cache & Report & 16 & 269.9 & 269.9 & 0.7 & 68 & 4.6 & 1.00~$\checkmark$ \\
+4\,cache & Report & 32 & 432.2 & 432.2 & 0.8 & 88 & 6.0 & 1.00~$\checkmark$ \\
+4\,cache & Report & 64 & 717.6 & 717.6 & 1.3 & 111 & 7.5 & 1.00~$\checkmark$ \\
+4\,cache & Report & 128 & 532.7 & 532.7 & 51.6 & 157 & 59.5 & 1.00~$\times$ \\
+\midrule
+4\,rr & TopK & 1 & 3.5 & 3.5 & 1.8 & 47 & 2.0 & 1.00~$\checkmark$ \\
+4\,rr & TopK & 2 & 8.0 & 8.0 & 1.8 & 38 & 2.0 & 1.00~$\checkmark$ \\
+4\,rr & TopK & 4 & 13.9 & 13.9 & 1.8 & 42 & 2.1 & 1.00~$\checkmark$ \\
+4\,rr & TopK & 8 & 18.0 & 18.0 & 13.7 & 748 & 17.0 & 1.00~$\times$ \\
+4\,rr & Report & 1 & 16.1 & 16.1 & 1.8 & 39 & 4.1 & 1.00~$\checkmark$ \\
+4\,rr & Report & 2 & 36.1 & 36.1 & 1.8 & 36 & 3.9 & 1.00~$\checkmark$ \\
+4\,rr & Report & 4 & 62.7 & 62.7 & 1.8 & 39 & 4.1 & 1.00~$\checkmark$ \\
+4\,rr & Report & 8 & 87.0 & 87.0 & 2.7 & 103 & 8.9 & 1.00~$\checkmark$ \\
+4\,rr & Report & 16 & 176.4 & 176.4 & 4.1 & 199 & 14.8 & 1.00~$\checkmark$ \\
+4\,rr & Report & 32 & 61.3 & 61.3 & 89.5 & 2141 & 149.7 & 1.00~$\times$ \\
+\midrule
+1\,cache/rr & TopK & 1 & 2.1 & 14.9 & 0.8 & 64 & 17.0 & 0.14~$\checkmark$ \\
+1\,cache/rr & TopK & 2 & 6.4 & 29.9 & 1.3 & 67 & 17.8 & 0.21~$\checkmark$ \\
+1\,cache/rr & TopK & 4 & 10.7 & 51.2 & 2.2 & 74 & 20.3 & 0.21~$\checkmark$ \\
+1\,cache/rr & TopK & 8 & 14.9 & 78.9 & 2.9 & 99 & 27.3 & 0.19~$\checkmark$ \\
+1\,cache/rr & TopK & 16 & 19.2 & 89.6 & 3.8 & 157 & 43.6 & 0.21~$\times$ \\
+1\,cache/rr & Report & 1 & 14.4 & 14.4 & 0.5 & 65 & 113.3 & 1.00~$\checkmark$ \\
+1\,cache/rr & Report & 2 & 13.8 & 13.8 & 1.1 & 66 & 110.1 & 1.00~$\checkmark$ \\
+1\,cache/rr & Report & 4 & 0.0 & 0.0 & -- & -- & -- & 0.00~$\times$ \\
+\midrule
+2\,cache & TopK & 1 & 2.1 & 14.9 & 0.8 & 64 & 17.0 & 0.14~$\checkmark$ \\
+2\,cache & TopK & 2 & 6.4 & 29.9 & 4.2 & 73 & 23.0 & 0.21~$\times$ \\
+2\,cache & Report & 1 & 17.1 & 17.1 & 0.5 & 65 & 134.4 & 1.00~$\checkmark$ \\
+2\,cache & Report & 2 & 33.9 & 33.9 & 0.5 & 66 & 134.4 & 1.00~$\checkmark$ \\
+2\,cache & Report & 4 & 36.8 & 36.8 & 1.0 & 67 & 137.2 & 1.00~$\checkmark$ \\
+2\,cache & Report & 8 & 47.9 & 47.9 & 1.3 & 68 & 138.7 & 1.00~$\checkmark$ \\
+2\,cache & Report & 16 & 81.6 & 98.7 & 2.2 & 72 & 143.9 & 0.86~$\checkmark$ \\
+2\,cache & Report & 32 & 250.4 & 250.4 & 5.3 & 81 & 159.4 & 1.00~$\checkmark$ \\
+2\,cache & Report & 64 & 107.8 & 141.9 & 8.6 & 84 & 160.1 & 0.82~$\checkmark$ \\
+2\,cache & Report & 128 & 0.0 & 0.0 & -- & -- & -- & 0.00~$\times$ \\
+\midrule
+2\,rr & TopK & 1 & 2.1 & 14.9 & 4.2 & 74 & 23.0 & 0.14~$\times$ \\
+2\,rr & Report & 1 & 9.5 & 9.5 & 0.5 & 65 & 74.5 & 1.00~$\checkmark$ \\
+2\,rr & Report & 2 & 17.1 & 34.1 & 1.0 & 67 & 137.5 & 0.50~$\checkmark$ \\
+2\,rr & Report & 4 & 11.1 & 11.1 & 1.0 & 66 & 88.7 & 1.00~$\checkmark$ \\
+2\,rr & Report & 8 & 42.7 & 42.7 & 1.5 & 68 & 99.1 & 1.00~$\checkmark$ \\
+2\,rr & Report & 16 & 156.7 & 156.7 & 1.9 & 71 & 143.2 & 1.00~$\checkmark$ \\
+2\,rr & Report & 32 & 231.5 & 248.6 & 4.0 & 82 & 160.3 & 0.94~$\checkmark$ \\
+2\,rr & Report & 64 & 162.8 & 162.8 & 8.3 & 82 & 158.0 & 1.00~$\checkmark$ \\
+2\,rr & Report & 128 & 0.0 & 0.0 & -- & -- & -- & 0.00~$\times$ \\
+\midrule
+4\,cache & TopK & 1 & 2.1 & 14.9 & 0.7 & 64 & 17.0 & 0.14~$\checkmark$ \\
+4\,cache & TopK & 2 & 6.4 & 29.9 & 4.2 & 74 & 23.0 & 0.21~$\times$ \\
+4\,cache & Report & 1 & 11.9 & 11.9 & 0.5 & 65 & 92.9 & 1.00~$\checkmark$ \\
+4\,cache & Report & 2 & 32.0 & 32.0 & 0.5 & 65 & 134.4 & 1.00~$\checkmark$ \\
+4\,cache & Report & 4 & 40.3 & 40.3 & 4.3 & 67 & 134.4 & 1.00~$\checkmark$ \\
+4\,cache & Report & 8 & 85.6 & 85.6 & 1.3 & 68 & 137.7 & 1.00~$\checkmark$ \\
+4\,cache & Report & 16 & 135.9 & 135.9 & 2.0 & 69 & 140.7 & 1.00~$\checkmark$ \\
+4\,cache & Report & 32 & 252.9 & 270.0 & 2.3 & 73 & 144.1 & 0.95~$\checkmark$ \\
+4\,cache & Report & 64 & 303.8 & 355.0 & 4.6 & 80 & 154.0 & 0.89~$\checkmark$ \\
+4\,cache & Report & 128 & 257.4 & 274.5 & 5.5 & 86 & 162.9 & 0.95~$\checkmark$ \\
+4\,cache & Report & 256 & 15.7 & 15.7 & 1.1 & 69 & 130.4 & 1.00~$\checkmark$ \\
+\midrule
+4\,rr & TopK & 1 & 2.1 & 12.8 & 4.3 & 74 & 23.0 & 0.17~$\times$ \\
+4\,rr & Report & 1 & 13.0 & 13.0 & 0.8 & 65 & 102.3 & 1.00~$\checkmark$ \\
+4\,rr & Report & 2 & 27.4 & 27.4 & 0.5 & 65 & 134.3 & 1.00~$\checkmark$ \\
+4\,rr & Report & 4 & 40.5 & 40.5 & 1.0 & 66 & 134.4 & 1.00~$\checkmark$ \\
+4\,rr & Report & 8 & 46.7 & 63.7 & 1.0 & 67 & 136.8 & 0.80~$\checkmark$ \\
+4\,rr & Report & 16 & 112.0 & 129.1 & 1.5 & 69 & 139.1 & 0.89~$\checkmark$ \\
+4\,rr & Report & 32 & 265.1 & 265.1 & 2.2 & 70 & 142.2 & 1.00~$\checkmark$ \\
+4\,rr & Report & 64 & 441.6 & 458.7 & 1.3 & 71 & 145.4 & 0.97~$\checkmark$ \\
+4\,rr & Report & 128 & 481.4 & 566.7 & 5.1 & 76 & 147.9 & 0.88~$\checkmark$ \\
+4\,rr & Report & 256 & 0.0 & 0.0 & -- & -- & -- & 0.00~$\times$ \\
+\midrule
+\bottomrule
+\end{longtable}

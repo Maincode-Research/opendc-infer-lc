@@ -1,0 +1,114 @@
+% Single-node 235B full results matrix (appendix).
+% Requires in preamble:
+%   \usepackage{booktabs, longtable, array, pdflscape}
+%   \usepackage{amssymb}   % for \checkmark used by \qyes below
+% The \qyes/\qno markers are defined here with \providecommand so this
+% fragment compiles standalone; a preamble definition (if any) wins.
+\providecommand{\qyes}{\ensuremath{\checkmark}}
+\providecommand{\qno}{\ensuremath{\times}}
+
+\begin{landscape}
+
+\begingroup
+\small
+% \setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.08}
+
+\begin{longtable}{@{}l l r c r r r r r c c@{}}
+\caption{Single-node 235B complete results matrix: every run $\times$ workload $\times$ load point.
+Qwen3-235B-A22B, 8$\times$AMD MI355X, TP$=8$.
+Goodput is measured in SLO-qualified output tokens/s; latencies are in seconds, except TPOT in seconds/token.
+Q denotes whether the run is SLO-qualified; succ. denotes success rate; qual. denotes needle-recall quality.}
+\label{tab:full-matrix}\\
+
+\toprule
+config & workload & lvl & Q & goodput & raw & TTFT$_{95}$ & TPOT$_{95}$ & E2E$_{95}$ & succ & qual \\
+\midrule
+\endfirsthead
+
+\caption[]{Single-node 235B complete results matrix continued.}\\
+\toprule
+config & workload & lvl & Q & goodput & raw & TTFT$_{95}$ & TPOT$_{95}$ & E2E$_{95}$ & succ & qual \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{11}{r@{}}{\emph{continued on next page}}\\
+\endfoot
+
+\bottomrule
+\endlastfoot
+\midrule
+SGLang BF16 & lc\_128k & 1 & \qyes & 0.933 & 0.933 & 6.95 & 0.0145 & 7.04 & 1 & 1 \\
+SGLang BF16 & lc\_128k & 2 & \qno & 0.933 & 0.933 & 13.8 & 1.13 & 14.1 & 1 & 1 \\
+SGLang BF16 & lc\_32k & 1 & \qyes & 6.53 & 6.53 & 0.971 & 0.0131 & 1.05 & 1 & 1 \\
+SGLang BF16 & lc\_32k & 2 & \qno & 6.77 & 6.77 & 2.01 & 0.152 & 2.17 & 1 & 1 \\
+SGLang BF16 & lc\_8k & 1 & \qyes & 13.7 & 13.7 & 0.213 & 0.0128 & 0.292 & 1 & 1 \\
+SGLang BF16 & lc\_8k & 2 & \qyes & 19.4 & 19.6 & 0.226 & 0.0465 & 0.505 & 1 & 0.99 \\
+SGLang BF16 & lc\_8k & 4 & \qyes & 31.3 & 31.3 & 0.803 & 0.0848 & 0.922 & 1 & 1 \\
+SGLang BF16 & lc\_8k & 8 & \qno & 35.6 & 35.6 & 1.56 & 0.185 & 1.73 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 1 & \qyes & 25.6 & 25.6 & 0.169 & 0.0130 & 0.250 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 2 & \qyes & 32.7 & 33.0 & 0.325 & 0.0314 & 0.461 & 1 & 0.99 \\
+SGLang BF16 & lc\_cache & 4 & \qyes & 46.5 & 46.5 & 0.447 & 0.0406 & 0.643 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 8 & \qyes & 65.1 & 65.1 & 0.627 & 0.0754 & 1.01 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 16 & \qyes & 99.6 & 99.6 & 1.10 & 0.109 & 1.51 & 1 & 1 \\
+SGLang BF16 & lc\_cache & 32 & \qno & 102 & 102.0 & 2.12 & 0.175 & 2.92 & 1 & 1 \\
+
+\midrule
+vLLM BF16 & lc\_128k & 1 & \qno & 0.233 & 0.233 & 19.7 & 1.04 & 26.0 & 1 & 1 \\
+vLLM BF16 & lc\_32k & 1 & \qyes & 3.62 & 3.62 & 1.74 & 0.0350 & 1.95 & 1 & 1 \\
+vLLM BF16 & lc\_32k & 2 & \qno & 3.27 & 3.27 & 4.64 & 0.436 & 5.08 & 1 & 1 \\
+vLLM BF16 & lc\_8k & 1 & \qyes & 14.7 & 14.7 & 0.270 & 0.0364 & 0.485 & 1 & 1 \\
+vLLM BF16 & lc\_8k & 2 & \qyes & 22.2 & 22.2 & 0.535 & 0.0738 & 0.744 & 1 & 1 \\
+vLLM BF16 & lc\_8k & 4 & \qno & 33.6 & 33.6 & 0.807 & 0.153 & 1.23 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 1 & \qyes & 12.1 & 12.1 & 0.349 & 0.0354 & 0.558 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 2 & \qyes & 16.3 & 16.3 & 0.617 & 0.0741 & 0.836 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 4 & \qyes & 32.7 & 32.7 & 0.625 & 0.0735 & 0.878 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 8 & \qyes & 47.5 & 47.5 & 0.914 & 0.120 & 1.49 & 1 & 1 \\
+vLLM BF16 & lc\_cache & 16 & \qno & 59.5 & 59.5 & 1.62 & 0.139 & 2.21 & 1 & 1 \\
+
+\midrule
+vLLM BF16 cold & lc\_cache & 1 & \qyes & 3.03 & 3.03 & 2.09 & 0.0352 & 2.30 & 1 & 1 \\
+vLLM BF16 cold & lc\_cache & 2 & \qno & 2.33 & 2.33 & 5.40 & 0.441 & 5.85 & 1 & 1 \\
+
+\midrule
+vLLM BF16 graphs & lc\_128k & 1 & \qno & 0.233 & 0.233 & 19.7 & 1.04 & 25.9 & 1 & 1 \\
+vLLM BF16 graphs & lc\_32k & 1 & \qno & 1.98 & 1.98 & 1.88 & 0.272 & 3.50 & 1 & 1 \\
+vLLM BF16 graphs & lc\_8k & 1 & \qyes & 9.10 & 9.10 & 0.301 & 0.0791 & 0.771 & 1 & 1 \\
+vLLM BF16 graphs & lc\_8k & 2 & \qyes & 15.9 & 15.9 & 0.559 & 0.111 & 1.03 & 1 & 1 \\
+vLLM BF16 graphs & lc\_8k & 4 & \qno & 25.0 & 25.0 & 0.796 & 0.179 & 1.45 & 1 & 1 \\
+vLLM BF16 graphs & lc\_cache & 1 & \qno & 3.15 & 3.15 & 0.516 & 0.271 & 2.14 & 1 & 1 \\
+
+\midrule
+vLLM BF16 open & lc\_32k & 1 & \qno & 5.60 & 5.60 & 127 & 0.759 & 129 & 1 & 1 \\
+
+\midrule
+vLLM MXFP4 & lc\_128k & 1 & \qno & 0.233 & 0.233 & 19.2 & 1.04 & 25.5 & 1 & 1 \\
+vLLM MXFP4 & lc\_32k & 1 & \qyes & 3.85 & 3.85 & 1.63 & 0.0309 & 1.81 & 1 & 1 \\
+vLLM MXFP4 & lc\_32k & 2 & \qno & 3.27 & 3.27 & 4.44 & 0.418 & 4.72 & 1 & 1 \\
+vLLM MXFP4 & lc\_8k & 1 & \qyes & 0.583 & 0.583 & 0.353 & 0.0291 & 0.526 & 1 & 1 \\
+vLLM MXFP4 & lc\_8k & 2 & \qyes & 21.2 & 21.2 & 0.477 & 0.0655 & 0.659 & 1 & 1 \\
+vLLM MXFP4 & lc\_8k & 4 & \qno & 30.2 & 30.2 & 0.726 & 0.162 & 1.26 & 1 & 1 \\
+vLLM MXFP4 & lc\_cache & 1 & \qyes & 12.6 & 12.6 & 0.352 & 0.0304 & 0.530 & 1 & 1 \\
+vLLM MXFP4 & lc\_cache & 2 & \qyes & 17.1 & 17.1 & 0.609 & 0.0693 & 0.788 & 1 & 1 \\
+vLLM MXFP4 & lc\_cache & 4 & \qyes & 34.2 & 34.2 & 0.617 & 0.0695 & 0.828 & 1 & 1 \\
+vLLM MXFP4 & lc\_cache & 8 & \qyes & 48.3 & 48.3 & 0.931 & 0.118 & 1.27 & 1 & 1 \\
+vLLM MXFP4 & lc\_cache & 16 & \qno & 59.7 & 59.7 & 1.58 & 0.140 & 2.20 & 1 & 1 \\
+
+\midrule
+vLLM FP8(dyn) & lc\_128k & 1 & \qno & 0.233 & 0.233 & 21.2 & 1.05 & 27.4 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_32k & 1 & \qyes & 2.92 & 2.92 & 2.10 & 0.0464 & 2.38 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_32k & 2 & \qno & 2.33 & 2.33 & 5.13 & 0.498 & 5.73 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_8k & 1 & \qyes & 11.2 & 11.2 & 0.369 & 0.0436 & 0.627 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_8k & 2 & \qyes & 16.8 & 16.8 & 0.724 & 0.0961 & 0.989 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_8k & 4 & \qno & 24.7 & 24.7 & 1.07 & 0.202 & 1.64 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_cache & 1 & \qyes & 10.8 & 10.8 & 0.359 & 0.0467 & 0.633 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_cache & 2 & \qyes & 14.9 & 14.9 & 0.647 & 0.0830 & 0.941 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_cache & 4 & \qyes & 29.9 & 29.9 & 0.655 & 0.0819 & 0.973 & 1 & 1 \\
+vLLM FP8(dyn) & lc\_cache & 8 & \qno & 44.5 & 44.5 & 0.976 & 0.135 & 1.55 & 1 & 1 \\
+
+\end{longtable}
+
+\endgroup
+
+\end{landscape}
